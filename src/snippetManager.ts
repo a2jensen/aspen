@@ -1,13 +1,8 @@
 /* eslint-disable prefer-const */
 /* eslint-disable eqeqeq */
 /* eslint-disable curly */
-/* eslint-disable @typescript-eslint/quotes */
 /* eslint-disable prettier/prettier */
-/* eslint-disable prefer-const */
-/* eslint-disable eqeqeq */
-/* eslint-disable curly */
 /* eslint-disable @typescript-eslint/quotes */
-/* eslint-disable prettier/prettier */
 import { RangeSetBuilder } from '@codemirror/state';
 import { ContentsManager } from "@jupyterlab/services";
 import { TemplatesManager } from './TemplatesManager';
@@ -18,6 +13,7 @@ import {
   EditorView,
   ViewUpdate
 } from '@codemirror/view';
+import { getTriggeredByCtrlEnter, setTriggeredByCtrlEnter } from './customkeyBinds';
 
 
 /**
@@ -41,7 +37,7 @@ export class SnippetsManager {
     this.cellMap = new Map();
     this.cellCounter = 0;
     this.templatesManager = templates;
-    //this.contentsManager = contentsManager;
+
     /**Purpose: If the template is deleted it will call deleteSnippets */
     document.addEventListener('TemplateDeleted', (event: Event) => {
     const customEvent = event as CustomEvent;
@@ -115,6 +111,7 @@ export class SnippetsManager {
     console.log(`Snippets remaining after delete:`, this.snippetTracker);
   }
 
+  //UNLESS I MAKE UPDATE TAKE IN ANOTHER VARABLE BEING EXIT SNIPPET AND IF ITS TRUE THEN DONT EXPAND AND SAME WITH THE OTHER THING???
   /**
    * Updates all snippet line positions after editor changes
    * 
@@ -136,11 +133,10 @@ export class SnippetsManager {
       const cellID = this.cellMap.get(view);
       if (!cellID) return;
   
-      const oldDoc = update.startState.doc; // Previous document state
-      const newDoc = update.state.doc;      // Updated document state
-      const newTotalLines = newDoc.lines; //total of line after changes
+      const oldDoc = update.startState.doc; //this is the previous editor state
+      const newDoc = update.state.doc;     
+      const newTotalLines = newDoc.lines; 
       
-
       //from A and to A are the new things that were added, so we checking it with old doc to see what was inserted and what was not
       update.changes.iterChanges((fromA, toA, fromB, toB, insertedText) => {
         const insertedLines = insertedText.toString().split("\n").length - 1; //how many new line inerted
@@ -149,13 +145,23 @@ export class SnippetsManager {
         for (const snippet of this.snippetTracker) {
           let { start_line, end_line } = snippet;
           if (snippet.cell_id !== cellID) continue; 
-          //  Text inserted
+          //  Text inserted above 
           if (fromA < oldDoc.line(start_line).from) {
             start_line += insertedLines - removedLines;
             end_line += insertedLines - removedLines;
           }
-          //Text inserted inside the snippet → expand snippet range
           else if (fromA >= oldDoc.line(start_line).from && toA <= oldDoc.line(end_line).to) {
+                const atStart = (fromA === oldDoc.line(start_line).from);
+                const AtEnd = (toA === oldDoc.line(end_line).to);
+            //must be at the very start or very end and have clicked the keybind in order to exit snippet
+                if(AtEnd && getTriggeredByCtrlEnter()){
+                  setTriggeredByCtrlEnter(false);
+                  continue;
+                }
+                else if(atStart && getTriggeredByCtrlEnter()){
+                  setTriggeredByCtrlEnter(false);
+                  start_line += 1;
+                }
             end_line += insertedLines - removedLines;
           }
     
@@ -179,7 +185,6 @@ export class SnippetsManager {
           })
         }
       });
-      console.log("Updated snippet tracker:", this.snippetTracker);
     }
 
   /**
@@ -200,19 +205,12 @@ export class SnippetsManager {
   assignDecorations(view: EditorView): DecorationSet {
     const cellID = this.cellMap.get(view);
     if (!cellID) return Decoration.none;
-
     const builder = new RangeSetBuilder<Decoration>();
     
-    console.log("snippetTracker: CHECKKK", this.snippetTracker);
-    console.log("cellID: ", this.templatesManager.activeTemplateHighlightIds);
-    //Issue here is that snippetsInCell does not have have the the save snippet in here 
     const snippetsInCell = this.snippetTracker
     .filter(s => s.cell_id === cellID)
     .filter(s => this.templatesManager.activeTemplateHighlightIds.has(s.template_id))
     .sort((a, b) => a.start_line - b.start_line);
-
-    console.log("Snippets in cell:", snippetsInCell);
-    console.log("active template highlight IDs:", this.templatesManager.activeTemplateHighlightIds);
 
     //goes through the snippetTracker and checks startline/endline for each
     for (const snippet of snippetsInCell) {
@@ -226,7 +224,6 @@ export class SnippetsManager {
       const template = this.templatesManager.get(snippet.template_id);
       const borderColor = template ? template.color : undefined;
 
-      // Apply borders to snippet start & end, currently using pink (#FFC0CB)
       builder.add(startLine.from, startLine.from, Decoration.line({
           attributes: { 
             style: `border-top: 2px solid ${borderColor}; border-left: 2px solid ${borderColor}; border-right: 2px solid ${borderColor};`,

@@ -7,13 +7,15 @@ import {
   EditorView,
   ViewPlugin,
   ViewUpdate,
+  keymap
 } from '@codemirror/view';
 import { SnippetsManager } from './snippetManager';
+import { defaultKeymap} from '@codemirror/commands';
+import { customKeymap } from './customkeyBinds';
 
 // Create a global flag to track if the event listener has been registered
 let saveSnippetListenerRegistered = false;
 let currentView: EditorView | null = null;
-
 /**
  * 
  * This serves as the main entry point for integrating CodeMirror into the ASPEN extension.
@@ -24,88 +26,33 @@ let currentView: EditorView | null = null;
  * @returns ViewPluginExtension. Create a plugin for a class whose constructor takes a single editor view as argument.
  */
 export function CodeMirrorExtension(snippetsManager: SnippetsManager): Extension {
-  // Register the global event listener only once
-  if (!saveSnippetListenerRegistered) {
+  if(!saveSnippetListenerRegistered){
     saveSnippetListenerRegistered = true;
-    
-    document.addEventListener('TemplateDeleted', (event: Event) => {
-      if (!currentView) {
-        console.warn("No active editor view available");
-        return;
-      }
-      // Update decorations
-      currentView.dispatch({
-        effects: [] 
-      });
-  });
-  
-    document.addEventListener('Toggle Template Highlight', (event) => {
-      if (!currentView) {
-        console.warn("No active editor view available");
-        return;
-      }
-      // Force the view to update which will trigger the update method
-      // where decorations are refreshed
-      currentView.dispatch({
-        effects: [], // Empty transaction to trigger an update
-      });
-    });
-
-    document.addEventListener('TemplateDeleted', (event: Event) => {
-      if (!currentView) {
-        console.warn("No active editor view available");
-        return;
-      }
-      // Update decorations
-      currentView.dispatch({
-        effects: [] 
-      });
-  });
-  
-    document.addEventListener('Toggle Template Highlight', (event) => {
-      if (!currentView) {
-        console.warn("No active editor view available");
-        return;
-      }
-      // Force the view to update which will trigger the update method
-      // where decorations are refreshed
-      currentView.dispatch({
-        effects: [], // Empty transaction to trigger an update
-      });
-    });
 
     // This event listener will now be registered only once
-   document.addEventListener('Save Code Snippet', (event) => {
-      const templateID = (event as CustomEvent).detail.templateID;
-      
+    document.addEventListener('Save Code Snippet', (event) => {
+    const templateID = (event as CustomEvent).detail.templateID;
       if (!currentView) {
         console.warn("No active editor view available");
         return;
-      }
-      const selection = currentView.state.selection.main;
-      const startLine = currentView.state.doc.lineAt(selection.from).number;
-      const endLine = currentView.state.doc.lineAt(selection.to).number;
-      
-  
-      const droppedText = currentView.state.sliceDoc(selection.from, selection.to).trim();
-      
-      if (!droppedText) {
-        console.warn("Skipping empty snippet");
-        return; // Do not create an empty snippet
-      }
-     
-      console.log("Decorations should be addedddd");
-      //Issue here because of design its not being applied 
-      //Have to do an automatic refresh to reapply the decorations
-      setTimeout(() => {
-        snippetsManager.update(currentView!);
-        snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText);
-        snippetsManager.assignDecorations(currentView!);
-      }, 10);
+        }
+        const selection = currentView.state.selection.main;
+        const startLine = currentView.state.doc.lineAt(selection.from).number;
+        const endLine = currentView.state.doc.lineAt(selection.to).number;
+        const droppedText = currentView.state.sliceDoc(selection.from, selection.to).trim();    
+        if (!droppedText) {
+          console.warn("Skipping empty snippet");
+          return; // Do not create an empty snippet
+          }
+          
+        setTimeout(() => {
+          snippetsManager.update(currentView!);
+          snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText);
+          snippetsManager.assignDecorations(currentView!);
+          }, 10);
 
-    });
-  }
-  
+     });}
+
   const viewPlugin = ViewPlugin.fromClass(
     class {
       /** The current set of decorations in the editor */
@@ -133,43 +80,6 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager): Extension
         this.decorations = snippetsManager.assignDecorations(view);
         
         /**
-         * Event listener for paste events
-         * 
-         * Handles when a template is pasted into the editor from the clipboard.
-         * Parses the clipboard data and creates a new snippet instance if it contains
-         * a valid template.
-         */
-        view.dom.addEventListener("paste", event => {
-          event.preventDefault();
-  
-          const clipboardContent = event.clipboardData?.getData('application/json');
-          const droppedText = event.clipboardData?.getData('text/plain');
-          console.log("dropped text app/json", clipboardContent);
-          console.log("dropped text text/plain", droppedText);
-  
-          if (!clipboardContent) return;
-          if(!droppedText) return;
-  
-          const parsedText = JSON.parse(clipboardContent);
-          if(!(parsedText.marker === "aspen-template")) return; 
-          
-          const selection = view.state.selection.main;
-          const dropPos = selection.from;
-          const startLine = view.state.doc.lineAt(dropPos).number;
-          const endLine = startLine + droppedText.split('\n').length - 1;
-          console.log("Start line", startLine);
-          console.log("End line,", endLine);
-  
-          const templateId = parsedText.templateID;
-          console.log("The template id associated with the instance", templateId);
-          snippetsManager.create(view, startLine, endLine, templateId, droppedText);
-  
-          setTimeout(() => {
-            this.decorations = snippetsManager.assignDecorations(view);
-          }, 10); // A small delay to ensure updates are applied after the text is pasted
-        });
-  
-        /**
          * Event listener for drop events
          * 
          * Handles when a template is dragged and dropped into the editor.
@@ -181,8 +91,6 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager): Extension
          
           const dragContent = event.dataTransfer?.getData('application/json');
           const droppedText = event.dataTransfer?.getData('text/plain');
-          console.log("dropped text app/json", dragContent);
-          console.log("dropped text text/plain", droppedText);
   
           if (!dragContent) return;
           if (!droppedText) return;
@@ -194,9 +102,7 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager): Extension
           const selection = view.state.selection.main;
           const dropPos = selection.from;
           const startLine = view.state.doc.lineAt(dropPos).number;
-          //console.log("Start line", startLine);
           const endLine = startLine + droppedText.split('\n').length - 1;
-          //console.log("End line,", endLine);
           const templateID = parsedText.templateID;
   
           snippetsManager.create(view, startLine + 1, endLine - 1, templateID, droppedText);
@@ -204,7 +110,6 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager): Extension
           setTimeout(() => {
             snippetsManager.update(view);
             this.decorations = snippetsManager.assignDecorations(view);
-
             // move cursor to end of inserted text, so that there is no selection
             const cursorPos = dropPos + droppedText.length;
             view.dispatch({
@@ -213,6 +118,23 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager): Extension
             });
           }, 10); // A small delay to ensure updates are applied after the text is dropped
         });
+
+        /**
+         * Handles the refresh decorations for when the template is deleted 
+         * and when the toggle button is clicked.
+         */
+        const handleEvent = (event: Event)=>{
+        if(!view){
+          console.warn("No active view");
+          return;
+        }
+        view.dispatch({
+          effects: []
+          });
+          };
+        document.addEventListener('TemplateDeleted',handleEvent);
+        document.addEventListener('Toggle Template Highlight',handleEvent);
+
       }
       
       /**
@@ -240,12 +162,12 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager): Extension
         
         // Update the current view reference
         currentView = update.view;
-        
-        if (update.docChanged || update.transactions.length > 0) {
+
+      if (update.docChanged || update.transactions.length > 0) {
           snippetsManager.update(update.view, update);
           this.decorations = snippetsManager.assignDecorations(update.view);
-          
         }
+
       }
     },
     {
@@ -253,6 +175,6 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager): Extension
       decorations: v => v.decorations
     }
   );
-  
-  return [viewPlugin];
+
+  return [viewPlugin,customKeymap,keymap.of(defaultKeymap)];
 }

@@ -17,7 +17,6 @@ import { Synchronization } from './Synchronization'
 import { CodeMirrorExtension } from './CodeMirrorPlugin';
 import { IEditorExtensionRegistry } from '@jupyterlab/codemirror'; // Interface for registering CodeMirror Extensions
 
-
 /**
  * Activation function for our extension. Function is called
  * when the extension is activated by Jupyter Lab.
@@ -38,6 +37,7 @@ function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions:
   libraryWidget.id = "jupyterlab-librarywidget-sidebarRight";
   libraryWidget.title.iconClass = 'jp-SideBar-tabIcon'; 
   libraryWidget.title.caption = "Library display of templates";
+  
 
   /**
    * Event Listener for when a template is copied from the library.
@@ -99,6 +99,9 @@ function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions:
     }
   })
 
+  
+
+
   /**
    * Adding command that allows their highlighted code to be saved as a template.
    */
@@ -106,8 +109,7 @@ function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions:
     label: 'Save Code Snippet',
     execute: async () => {
       const snippet : string = window.getSelection()?.toString() || '';
-      if (snippet) {
-        console.log("Saving the snippet");
+      if (snippet){
         const template = await libraryWidget.createTemplate(snippet);
         
         if (template) {
@@ -129,7 +131,6 @@ function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions:
   commands.addCommand('templates:push', {
     label: "Push Changes To Template",
     execute: () => {
-      console.log("Starting logic for Push Changes To Template!")
       const content = window.getSelection();
       if (content?.rangeCount === 0 || !content) {
         return;
