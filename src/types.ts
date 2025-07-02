@@ -27,10 +27,11 @@ export interface Template {
 * @type template_id : string - reference to associated templateID
 */
 export interface Snippet {
-id: string,
-cell_id: number;
-content : string;
-start_line: number;
-end_line: number;
-template_id: string;
-}
+  id: string;
+  notebook_id : string;
+  cell_id: string;
+  content : string;
+  start_line: number;
+  end_line: number;
+  template_id: string;
+  }

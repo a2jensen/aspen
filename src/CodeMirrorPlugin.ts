@@ -12,6 +12,7 @@ import {
 import { SnippetsManager } from './snippetManager';
 import { defaultKeymap} from '@codemirror/commands';
 import { customKeymap } from './customkeyBinds';
+import { INotebookTracker } from "@jupyterlab/notebook"
 
 // Create a global flag to track if the event listener has been registered
 let saveSnippetListenerRegistered = false;
@@ -25,7 +26,7 @@ let currentView: EditorView | null = null;
  * @param snippetsManager 
  * @returns ViewPluginExtension. Create a plugin for a class whose constructor takes a single editor view as argument.
  */
-export function CodeMirrorExtension(snippetsManager: SnippetsManager): Extension {
+export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTracker : INotebookTracker): Extension {
   if(!saveSnippetListenerRegistered){
     saveSnippetListenerRegistered = true;
 
@@ -47,7 +48,19 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager): Extension
           
         setTimeout(() => {
           snippetsManager.update(currentView!);
-          snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText);
+          if (!notebookTracker?.currentWidget?.context?.path){
+            console.error("Failed to capture the cell ID of the currently active cell.")
+            return;
+          }
+          if (!notebookTracker?.currentWidget?.content.activeCell?.model.id){
+            console.error("Failed to capture the cell ID of the currently active cell.")
+            return;
+          }
+
+          const cellId : string = notebookTracker.currentWidget.content.activeCell.model.id;
+          const notebookId : string = notebookTracker.currentWidget.context.path
+          snippetsManager.create(currentView!, startLine + 1, endLine - 1, templateID, droppedText, notebookId, cellId);
+
           snippetsManager.assignDecorations(currentView!);
           }, 10);
 
@@ -105,11 +118,23 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager): Extension
           const endLine = startLine + droppedText.split('\n').length - 1;
           const templateID = parsedText.templateID;
   
-          snippetsManager.create(view, startLine + 1, endLine - 1, templateID, droppedText);
+          
 
           setTimeout(() => {
             snippetsManager.update(view);
-            this.decorations = snippetsManager.assignDecorations(view);
+            if (!notebookTracker?.currentWidget?.context?.path){
+              console.error("Failed to capture the cell ID of the currently active cell.")
+              return;
+            }
+            if (!notebookTracker?.currentWidget?.content.activeCell?.model.id){
+              console.error("Failed to capture the cell ID of the currently active cell.")
+              return;
+            }
+
+            const cellId : string = notebookTracker.currentWidget.content.activeCell.model.id;
+            const notebookId : string = notebookTracker.currentWidget.context.path
+            snippetsManager.create(currentView!, startLine + 1, endLine - 1, templateID, droppedText, notebookId, cellId);
+
             // move cursor to end of inserted text, so that there is no selection
             const cursorPos = dropPos + droppedText.length;
             view.dispatch({

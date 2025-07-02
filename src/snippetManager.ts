@@ -26,7 +26,7 @@ import { getTriggeredByCtrlEnter, setTriggeredByCtrlEnter } from './customkeyBin
 export class SnippetsManager {
   public cellCounter; /** Counter for generating unique cell IDs */
   public snippetTracker: Snippet[]; /** Array to keep track of all active snippets */
-  public cellMap: Map<EditorView, number>; /** Map to associate editor views with their unique cell IDs */
+  public cellMap: Map<EditorView, string>; /** Map to associate editor views with their unique cell IDs */
   //private contentsManager : ContentsManager;
   private templatesManager : TemplatesManager;
   /**
@@ -57,12 +57,11 @@ export class SnippetsManager {
    * If the view already has an ID, returns the existing ID.
    * Otherwise, increments the counter and assigns a new ID.
    */
-  assignCellID(view: EditorView) {
-    if (!this.cellMap.has(view)) {
-      this.cellCounter++;
-      this.cellMap.set(view, this.cellCounter);
+  assignCellID(view : EditorView, cell_id : string) {
+    if(!this.cellMap.has(view)) {
+      this.cellMap.set(view, cell_id);
     }
-    return this.cellMap.get(view) ?? 0;
+    return this.cellMap.get(view);
   }
 
   /**
@@ -77,11 +76,12 @@ export class SnippetsManager {
    * Method is called when a template is dropped or pasted into the editor.
    * It creates a new Snippet object and adds it to the snippetTracker.
    */
-  create(view: EditorView, startLine: number, endLine: number, templateID: string, content: string) {
-    const cellID = this.assignCellID(view);
+  create(view: EditorView, startLine: number, endLine: number, templateID: string, content: string, notebookId : string, cellIndex : string){
+    const cellID = this.assignCellID(view, cellIndex);
     const snippet = {
       id: `${Date.now()}`,
-      cell_id: cellID, 
+      notebook_id : notebookId,
+      cell_id: cellID ?? "", 
       content: content,
       start_line: startLine,
       end_line: endLine,

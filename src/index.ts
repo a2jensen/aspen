@@ -16,6 +16,7 @@ import { SnippetsManager } from './snippetManager';
 import { Synchronization } from './Synchronization'
 import { CodeMirrorExtension } from './CodeMirrorPlugin';
 import { IEditorExtensionRegistry } from '@jupyterlab/codemirror'; // Interface for registering CodeMirror Extensions
+import { INotebookTracker } from "@jupyterlab/notebook"
 
 /**
  * Activation function for our extension. Function is called
@@ -25,7 +26,7 @@ import { IEditorExtensionRegistry } from '@jupyterlab/codemirror'; // Interface 
  * @param restorer restorer - The layout restorer service for preserving widget state
  * @param extensions extensions - The registry for CodeMirror editor extensions
  */
-function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions: IEditorExtensionRegistry) {
+function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions: IEditorExtensionRegistry, notebookTracker : INotebookTracker) {
   console.log("perhaps perhaps");
   const { commands } = app;
 
@@ -217,8 +218,8 @@ function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions:
   extensions.addExtension({
     name: '@aspen/codemirror_plugin',
     factory: () => ({
-      extension: CodeMirrorExtension(snippetsManager),
-      instance: () => CodeMirrorExtension(snippetsManager),
+      extension: CodeMirrorExtension(snippetsManager, notebookTracker),
+      instance: () => CodeMirrorExtension(snippetsManager, notebookTracker),
       reconfigure: () => null
     })
   });
@@ -234,7 +235,7 @@ function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions:
 const aspen: JupyterFrontEndPlugin<void> = {
   id : 'aspen-extension', 
   autoStart: true,
-  requires : [ ILayoutRestorer, IEditorExtensionRegistry],
+  requires : [ ILayoutRestorer, IEditorExtensionRegistry, INotebookTracker],
   activate: activate
 };
 
