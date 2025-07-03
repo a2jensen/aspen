@@ -17,6 +17,7 @@ import { INotebookTracker } from "@jupyterlab/notebook"
 // Create a global flag to track if the event listener has been registered
 let saveSnippetListenerRegistered = false;
 let currentView: EditorView | null = null;
+let currentViewPlugin : any = null;
 /**
  * 
  * This serves as the main entry point for integrating CodeMirror into the ASPEN extension.
@@ -59,12 +60,31 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
 
           const cellId : string = notebookTracker.currentWidget.content.activeCell.model.id;
           const notebookId : string = notebookTracker.currentWidget.context.path
-          snippetsManager.create(currentView!, startLine + 1, endLine - 1, templateID, droppedText, notebookId, cellId);
+          snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
 
           snippetsManager.assignDecorations(currentView!);
           }, 10);
 
-     });}
+     });
+    document.addEventListener('Unsync', (event) => {
+      const snippetId = (event as CustomEvent).detail.snippetId;
+
+      if (!currentView || !currentViewPlugin) {
+        console.warn("No active editor view available");
+        return;
+      }
+
+      try {
+        if (currentViewPlugin) {
+          currentViewPlugin.decorations = snippetsManager.recomputeDecorations(currentView, snippetId);
+        } else {
+          console.warn("ViewPlugin not available or missing refreshDecorations method");
+        }
+      } catch (error) {
+        console.error("Error updating decorations:", error);
+      }
+    });
+    }
 
   const viewPlugin = ViewPlugin.fromClass(
     class {

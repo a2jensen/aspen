@@ -152,6 +152,45 @@ function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensions: I
     }
   })
 
+  commands.addCommand('templates:unsync', {
+    label: 'Unsync',
+    execute: () => {
+      // find if the cursor is within a snippet
+      const selection = window.getSelection();
+
+      if (!selection){
+        console.warn("Invalid window selection")
+        return
+      }
+
+      const snippetCheck = snippetHighlighted(selection)
+
+      if (!snippetCheck.highlighted){
+        console.warn("highlighted content was not identified as an instance");
+        return;
+      }
+
+      if (!snippetCheck.startDiv){
+        console.warn("invalid start div for the highlighted content");
+        return;
+      }
+
+      const snippetId = snippetCheck.startDiv.getAttribute('data-snippet-id');
+      if (!snippetId) {
+        console.warn("No snippet ID found.");
+        return;
+      }
+      
+      document.dispatchEvent(new CustomEvent('Unsync', {
+        detail : {
+          snippetId : snippetId
+        }
+      }))
+
+      snippetsManager.unsync(snippetId);
+    }
+  });
+
   /** Adding the templates:create command to their respective context menus */
   app.contextMenu.addItem({
     command: "templates:create",
@@ -174,6 +213,14 @@ function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensions: I
     selector: ".jp-Notebook",
     rank: 1
   });
+  app.contextMenu.addItem({
+    command: 'templates:unsync',
+    selector: '.jp-Notebook',
+    rank: 1
+  });
+  
+
+
 
   /** Registers Library Widget to the right sidebar. */
   app.shell.add(libraryWidget, "right", {rank: 300});
@@ -207,3 +254,25 @@ const aspen: JupyterFrontEndPlugin<void> = {
 };
 
 export default aspen;
+
+function snippetHighlighted( content : Selection ) : { highlighted : boolean, startDiv : Element | null} {
+  const range = content.getRangeAt(0);
+  const fragment = range.cloneContents();
+  const tempDiv = document.createElement('div');
+  tempDiv.appendChild(fragment);
+
+  const startCheck = tempDiv.querySelector('.snippet-start-line');
+  const endCheck = tempDiv.querySelector('.snippet-end-line');
+  
+  if (startCheck && endCheck) {
+    return {
+      highlighted : true,
+      startDiv: startCheck
+    }
+  } else {
+    return {
+      highlighted : false,
+      startDiv : null
+    }
+  }
+}
