@@ -192,43 +192,47 @@ export class TemplatesManager {
     }));
   }
 
-    /**
-     * Loads all templates from the filesystem into memory.
-     * 
-     * Used to initialize or refresh the templates array using the persisted JSON files.
-     * It provides data persistence across browser reloads and sessions.
-     * 
-     */
-    loadTemplates() {
-      // Clear existing templates before loading
-      this.templates = [];
-      this.contentsManager.get("/snippets").then(model => {
-        if (model.type === "directory") {
-          for (const file of model.content) {
-            this.contentsManager.get(file.path).then(fileModel => {
-              try {
-                const templateData = JSON.parse(fileModel.content as string);
-                const template: Template = {
-                  id: templateData.id || `${Date.now()}`,  // Use provided ID or generate new one
-                  name: templateData.name || file.name,    // Use provided name or filename
-                  content: templateData.content || "",     // Use provided content or empty string
-                  dateCreated: new Date(templateData.dateCreated || Date.now()),
-                  dateUpdated: new Date(templateData.dateUpdated || Date.now()),
-                  tags: templateData.tags || [],           // Use provided tags or empty array
-                  color: templateData.color || "#ffffff"   // Use provided color or default white
-                };
-                this.templates.push(template);
-                console.log(`Loaded template: ${template.name}`, template);
-              } catch (error) {
-                console.error(`Error parsing JSON from ${file.path}:`, error);
-              }
-            }).catch(error => {
-              console.error(`Error loading file: ${file.path}`, error);
-            });
+  /**
+   * Loads all templates from the filesystem into memory.
+   * 
+   * Used to initialize or refresh the templates array using the persisted JSON files.
+   * It provides data persistence across browser reloads and sessions.
+   * 
+   */
+  async loadTemplates() {
+    // Clear existing templates before loading
+    this.templates = [];
+
+    try {
+      const model = await this.contentsManager.get("/snippets");
+      
+      if (model.type === "directory") {
+        for (const file of model.content) {
+          try {
+            const fileModel = await this.contentsManager.get(file.path);
+            const templateData = JSON.parse(fileModel.content as string);
+
+            const template: Template = {
+              id: templateData.id || `${Date.now()}`,  // Use provided ID or generate new one
+              name: templateData.name || file.name,    // Use provided name or filename
+              content: templateData.content || "",     // Use provided content or empty string
+              dateCreated: new Date(templateData.dateCreated || Date.now()),
+              dateUpdated: new Date(templateData.dateUpdated || Date.now()),
+              tags: templateData.tags || [],           // Use provided tags or empty array
+              color: templateData.color || "#ffffff"   // Use provided color or default white
+            };
+
+            this.templates.push(template);
+            console.log(`Loaded template: ${template.name}`, template);
+          }
+          catch (error) {
+            console.error(`Error loading or parsing file: ${file.path}`, error);
           }
         }
-      }).catch(error => {
-        console.error("Error fetching snippets directory:", error);
-      });
+      }
     }
+    catch (error) {
+      console.error("Error fetching snippets directory:", error);
+    }
+  }
 }

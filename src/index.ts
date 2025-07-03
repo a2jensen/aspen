@@ -26,7 +26,8 @@ import {INotebookTracker} from "@jupyterlab/notebook";
  * @param restorer restorer - The layout restorer service for preserving widget state
  * @param extensions extensions - The registry for CodeMirror editor extensions
  */
-function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensions: IEditorExtensionRegistry, notebookTracker: INotebookTracker) {
+
+async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensions: IEditorExtensionRegistry, notebookTracker: INotebookTracker) {
   console.log("activating");
   const {commands} = app;
 
@@ -219,7 +220,7 @@ function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensions: I
     rank: 1
   });
   
-
+  await libraryWidget.loadTemplates(); // load the templates before adding the LibraryWidget
   /** Registers Library Widget to the right sidebar. */
   app.shell.add(libraryWidget, "right", {rank: 300});
 

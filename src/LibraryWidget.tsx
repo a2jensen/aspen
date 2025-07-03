@@ -52,7 +52,7 @@ function Library({
       toggleTemplate(lastCreatedTemplateId);
     }
   }, [lastCreatedTemplateId]);
- 
+
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>, template: Template) => {
     //added a line before and after the content in order to be able to get out of template, issue still there tho if we delete it it wont work
     event.dataTransfer.setData("text/plain", "\n" + template.content + "\n");
@@ -227,13 +227,12 @@ export class LibraryWidget extends ReactWidget {
   templateManager: TemplatesManager;
   snippetsManager: SnippetsManager;
   lastCreatedTemplateId?: string;
-  
+
   constructor(templatesManager: TemplatesManager, snippetsManager: SnippetsManager) {
     super();
     this.addClass("jp-LibraryWidget");
     this.templateManager = templatesManager;
     this.snippetsManager = snippetsManager;
-    this.loadTemplates();
   }
 
   async createTemplate(codeSnippet: string): Promise<Template | undefined> {
@@ -265,14 +264,14 @@ export class LibraryWidget extends ReactWidget {
     this.update();
   }
 
-  loadTemplates() {
-    this.templateManager.loadTemplates();
+  async loadTemplates() {
+    await this.templateManager.loadTemplates();
     this.update();
   }
 
   render() {
     console.log("RENDERING LIBRARY WIDGET", this.templateManager.templates);
-    return <Library 
+    return <Library
       templates={this.templateManager.templates}
       snippets={this.snippetsManager.snippetTracker}
       deleteTemplate={this.deleteTemplate}
