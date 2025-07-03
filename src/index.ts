@@ -7,16 +7,16 @@
 import {
   ILayoutRestorer, // Restore widgets layout and state on refresh
   JupyterFrontEnd, // Main JupyterLab application interface
-  JupyterFrontEndPlugin, // Interface for JupyterLab plugins
-} from '@jupyterlab/application'
-import { TemplatesManager } from './TemplatesManager';
-import { ContentsManager } from "@jupyterlab/services";
-import { LibraryWidget } from './LibraryWidget';
-import { SnippetsManager } from './snippetManager';
-import { Synchronization } from './Synchronization'
-import { CodeMirrorExtension } from './CodeMirrorPlugin';
-import { IEditorExtensionRegistry } from '@jupyterlab/codemirror'; // Interface for registering CodeMirror Extensions
-import { INotebookTracker } from "@jupyterlab/notebook"
+  JupyterFrontEndPlugin // Interface for JupyterLab plugins
+} from "@jupyterlab/application"
+import {TemplatesManager} from "./TemplatesManager";
+import {ContentsManager} from "@jupyterlab/services";
+import {LibraryWidget} from "./LibraryWidget";
+import {SnippetsManager} from "./snippetManager";
+import {Synchronization} from "./Synchronization";
+import {CodeMirrorExtension} from "./CodeMirrorPlugin";
+import {IEditorExtensionRegistry} from "@jupyterlab/codemirror"; // Interface for registering CodeMirror Extensions
+import {INotebookTracker} from "@jupyterlab/notebook";
 
 /**
  * Activation function for our extension. Function is called
@@ -26,9 +26,9 @@ import { INotebookTracker } from "@jupyterlab/notebook"
  * @param restorer restorer - The layout restorer service for preserving widget state
  * @param extensions extensions - The registry for CodeMirror editor extensions
  */
-function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions: IEditorExtensionRegistry, notebookTracker : INotebookTracker) {
-  console.log("perhaps perhaps");
-  const { commands } = app;
+function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensions: IEditorExtensionRegistry, notebookTracker: INotebookTracker) {
+  console.log("activating");
+  const {commands} = app;
 
   const contentsManager = new ContentsManager();
   const templatesManager = new TemplatesManager(contentsManager);
@@ -36,10 +36,9 @@ function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions:
   const libraryWidget = new LibraryWidget(templatesManager, snippetsManager);
   const synchronization = new Synchronization(templatesManager, snippetsManager, libraryWidget);
   libraryWidget.id = "jupyterlab-librarywidget-sidebarRight";
-  libraryWidget.title.iconClass = 'jp-SideBar-tabIcon'; 
+  libraryWidget.title.iconClass = "jp-SideBar-tabIcon"; 
   libraryWidget.title.caption = "Library display of templates";
   
-
   /**
    * Event Listener for when a template is copied from the library.
    * Before getting saved to the clipboard, we want to attach a marker as well as its ID onto it in JSON format.
@@ -51,85 +50,56 @@ function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions:
    *     - clearData([format]): Removes data of the specified format or all formats
    */
 
-/**
-  document.addEventListener("click", async (event) => {
-    const target  = event.target as HTMLElement;
-    if (target.classList.contains("template-copy")) {
-      console.log("Copy button clicked, checking clipboard data");
-
-      try {
-        const clipboardText = await navigator.clipboard.readText();
-        console.log("Clipboard content:", clipboardText);
-  
-        const clipboardData = JSON.parse(clipboardText);
-  
-        if(clipboardData.marker === "aspen-template") {
-          console.log("Template was copied:", clipboardData.id);
-        }
-        else{
-          console.warn("Clipboard does not contain a valid template.");
-        }
-      }
-      catch(err){
-        console.error("Error reading clipboard:", err);
-      }
-    }
-  });
-*/
-
   /**
- * Event Listener for when a template is dragged from the library.
- * 
- * Before getting saved to dataTransfer, we want to attach a marker as well as its ID onto it in JSON format.
- * 
- */
+   * Event Listener for when a template is dragged from the library.
+   * 
+   * Before getting saved to dataTransfer, we want to attach a marker as well as its ID onto it in JSON format.
+   * 
+   */
   document.addEventListener("dragstart", (event) => {
     const dragInfo = event.target as HTMLElement;
-    console.log("What is getting dragged, ", dragInfo);
+    console.log("What's getting dragged, ", dragInfo);
 
     if (dragInfo.classList.contains("template-snippet")) {
-      console.log("Whats getting dragged is a template")
+      console.log("What's getting dragged is a template");
 
       const templateData = {
         marker: "aspen-template",
-        templateID : dragInfo.getAttribute("data-template-id"),
-        content : dragInfo.innerText
+        templateID: dragInfo.getAttribute("data-template-id"),
+        content: dragInfo.innerText
       }
       console.log("Data that will be set onto the dataTransfer", templateData);
       event.dataTransfer?.setData("application/json", JSON.stringify(templateData));
     }
   })
 
-  
-
-
   /**
    * Adding command that allows their highlighted code to be saved as a template.
    */
-  commands.addCommand('templates:create', {
-    label: 'Save Code Snippet',
+  commands.addCommand("templates:create", {
+    label: "Save Code Snippet",
     execute: async () => {
-      const snippet : string = window.getSelection()?.toString() || '';
-      if (snippet){
+      const snippet: string = window.getSelection()?.toString() || "";
+      if (snippet) {
         const template = await libraryWidget.createTemplate(snippet);
         
         if (template) {
-          document.dispatchEvent(new CustomEvent('Save Code Snippet', {
+          document.dispatchEvent(new CustomEvent("Save Code Snippet", {
             detail: {
               snippetText: snippet,
               templateID: template.id
             }
           }));
-          console.log("Event Listener Dispatched!!!");
+          console.log("Event Listener Dispatched.");
         }
         else {
           console.error("Template creation failed.")
         }
       }
     },
-  }); 
+  });
 
-  commands.addCommand('templates:push', {
+  commands.addCommand("templates:push", {
     label: "Push Changes To Template",
     execute: () => {
       const content = window.getSelection();
@@ -147,27 +117,27 @@ function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions:
       console.log("range cloned contented : ", fragment)
 
       // Create a temporary wrapper to check for class names, acts as a temporary "mini-DOM" where we can make edits
-      const tempDiv = document.createElement('div');
-      console.log("tempDiv init ", tempDiv)
+      const tempDiv = document.createElement("div");
+      console.log("tempDiv init ", tempDiv);
       tempDiv.appendChild(fragment);
       console.log("tempDiv after appending : ", fragment)
 
-      const startCheck = tempDiv.querySelector('.snippet-start-line');
-      const endCheck = tempDiv.querySelector('.snippet-end-line');
-      console.log(`Start and end check ${startCheck} AND ${endCheck}`)
+      const startCheck = tempDiv.querySelector(".snippet-start-line");
+      const endCheck = tempDiv.querySelector(".snippet-end-line");
+      console.log(`Start and end check ${startCheck} AND ${endCheck}`);
       
       
-      if (startCheck && endCheck ) {
+      if (startCheck && endCheck) {
         /**
          * Grab the needed data and pass it into the synch function
          */
-        const templateId = startCheck?.getAttribute("data-associated-template")
+        const templateId = startCheck?.getAttribute("data-associated-template");
         console.log("templateId var: ", templateId);
 
         // Get all lines inside the tempDiv / highlighted snippet
         const codeLines = Array.from(tempDiv.querySelectorAll('.cm-line'))
-        .map(lineEl => (lineEl as HTMLElement).innerText.trimEnd());
-        const innerText = codeLines.join('\n'); // Explicitly join lines with \n
+          .map(lineEl => (lineEl as HTMLElement).innerText.trimEnd());
+        const innerText = codeLines.join("\n"); // Explicitly join lines with \n
 
         console.log("templateId var: ", templateId);
         console.log("Reconstructed inner text with newlines:\n", innerText);
@@ -184,46 +154,43 @@ function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions:
 
   /** Adding the templates:create command to their respective context menus */
   app.contextMenu.addItem({
-    command: 'templates:create',
-    selector: '.jp-FileEditor',
+    command: "templates:create",
+    selector: ".jp-FileEditor",
     rank : 1
   });
   app.contextMenu.addItem({
-    command: 'templates:create',
-    selector: '.jp-Notebook',
+    command: "templates:create",
+    selector: ".jp-Notebook",
     rank: 1
   });
 
   app.contextMenu.addItem({
-    command: 'templates:push',
-    selector: '.jp-FileEditor',
+    command: "templates:push",
+    selector: ".jp-FileEditor",
     rank : 1
   });
   app.contextMenu.addItem({
-    command: 'templates:push',
-    selector: '.jp-Notebook',
+    command: "templates:push",
+    selector: ".jp-Notebook",
     rank: 1
   });
-
-
 
   /** Registers Library Widget to the right sidebar. */
-  app.shell.add(libraryWidget, 'right', { rank : 300});
+  app.shell.add(libraryWidget, "right", {rank: 300});
 
   /** Registers the library widget with the layout restorer to
    * preserve its state across page reloads and sessions. */
-  restorer.add(libraryWidget, 'custom-sidebar-widget');
+  restorer.add(libraryWidget, "custom-sidebar-widget");
 
   /** Registers the CodeMirror Extension for snippet instance visualization and management. */
   extensions.addExtension({
-    name: '@aspen/codemirror_plugin',
+    name: "@aspen/codemirror_plugin",
     factory: () => ({
       extension: CodeMirrorExtension(snippetsManager, notebookTracker),
       instance: () => CodeMirrorExtension(snippetsManager, notebookTracker),
       reconfigure: () => null
     })
   });
-
 }
 
 /**
@@ -233,9 +200,9 @@ function activate( app: JupyterFrontEnd , restorer: ILayoutRestorer, extensions:
  * This object tells JupyterLab how to find and initialize the extension.
  */
 const aspen: JupyterFrontEndPlugin<void> = {
-  id : 'aspen-extension', 
+  id: "aspen-extension",
   autoStart: true,
-  requires : [ ILayoutRestorer, IEditorExtensionRegistry, INotebookTracker],
+  requires: [ILayoutRestorer, IEditorExtensionRegistry, INotebookTracker],
   activate: activate
 };
 

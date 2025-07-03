@@ -184,15 +184,13 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
       update(update: ViewUpdate) {
         // Update the stored view instance
         this.view = update.view;
-        
         // Update the current view reference
         currentView = update.view;
 
-      if (update.docChanged || update.transactions.length > 0) {
+        if (update.docChanged || update.transactions.length > 0) {
           snippetsManager.update(update.view, update);
           this.decorations = snippetsManager.assignDecorations(update.view);
         }
-
       }
     },
     {
