@@ -220,8 +220,6 @@ function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensions: I
   });
   
 
-
-
   /** Registers Library Widget to the right sidebar. */
   app.shell.add(libraryWidget, "right", {rank: 300});
 

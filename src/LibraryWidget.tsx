@@ -13,14 +13,24 @@ import {SnippetsManager} from "./snippetManager";
 /**
  * React Library Component.
  */
-function Library({templates, snippets, deleteTemplate, renameTemplate, editTemplate,toggleTemplateColor,activeTemplateHighlightIds}: {
+function Library({
+  templates,
+  snippets,
+  deleteTemplate,
+  renameTemplate,
+  editTemplate,
+  toggleTemplateColor,
+  activeTemplateHighlightIds,
+  lastCreatedTemplateId
+}: {
   templates: Template[],
   snippets: Snippet[],
   deleteTemplate: (id: string, name: string) => void,
   renameTemplate: (id: string, name: string) => void,
   editTemplate: (id: string, name: string) => void,
   toggleTemplateColor: (id: string) => void,
-  activeTemplateHighlightIds: Set<string>
+  activeTemplateHighlightIds: Set<string>,
+  lastCreatedTemplateId?: string
 }) {
   console.log("Library received templates:", templates);
   const [expandedTemplates, setExpandedTemplates] = useState<{[key: string]: boolean}>({});
@@ -36,6 +46,13 @@ function Library({templates, snippets, deleteTemplate, renameTemplate, editTempl
     }));
   };
 
+  // when a template is created, toggle it open
+  React.useEffect(() => {
+    if (lastCreatedTemplateId) {
+      toggleTemplate(lastCreatedTemplateId);
+    }
+  }, [lastCreatedTemplateId]);
+ 
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>, template: Template) => {
     //added a line before and after the content in order to be able to get out of template, issue still there tho if we delete it it wont work
     event.dataTransfer.setData("text/plain", "\n" + template.content + "\n");
@@ -209,7 +226,8 @@ function Library({templates, snippets, deleteTemplate, renameTemplate, editTempl
 export class LibraryWidget extends ReactWidget {
   templateManager: TemplatesManager;
   snippetsManager: SnippetsManager;
-
+  lastCreatedTemplateId?: string;
+  
   constructor(templatesManager: TemplatesManager, snippetsManager: SnippetsManager) {
     super();
     this.addClass("jp-LibraryWidget");
@@ -220,8 +238,9 @@ export class LibraryWidget extends ReactWidget {
 
   async createTemplate(codeSnippet: string): Promise<Template | undefined> {
     const template = await this.templateManager.create(codeSnippet);
-    console.log(template, "inside createtemplate");
-    console.log("templates: ", this.templateManager.templates);
+    if (template) {
+      this.lastCreatedTemplateId = template.id;
+    }
     this.update();
     return template;
   }
@@ -261,6 +280,7 @@ export class LibraryWidget extends ReactWidget {
       editTemplate={this.editTemplate}
       toggleTemplateColor={this.toggleTemplateColor}
       activeTemplateHighlightIds={this.templateManager.activeTemplateHighlightIds}
+      lastCreatedTemplateId={this.lastCreatedTemplateId}
     />;
   }
 }

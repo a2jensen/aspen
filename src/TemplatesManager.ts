@@ -42,7 +42,8 @@ export class TemplatesManager {
    * 2. Adds the template to the in-memory array
    * 3. Persists the template as a JSON file in the /snippets directory
    */
-  async create(codeSnippet: string ) {
+
+  async create(codeSnippet: string) {
     const template: Template = {
       id: `${Date.now()}`,  // Use timestamp as unique ID
       name: `Template ${this.templates.length + 1}`,  // Auto-generate name based on count
@@ -88,9 +89,9 @@ export class TemplatesManager {
     this.contentsManager.delete(`/snippets/${template.name}.json`).then(() => {
       console.log(`Successfully deleted template ${template.name} ${templateId}`);
       document.dispatchEvent(new CustomEvent('TemplateDeleted', {
-        detail: { templateID: templateId}
+        detail: {templateID: templateId}
       }));
-    }).catch((error: unknown ) => {
+    }).catch((error: unknown) => {
       console.error(`Failed to delete template ${template.name} ${templateId}`, error);
     });
   }
