@@ -181,12 +181,6 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
         console.warn("No snippet ID found.");
         return;
       }
-      
-      document.dispatchEvent(new CustomEvent('Unsync', {
-        detail : {
-          snippetId : snippetId
-        }
-      }))
 
       snippetsManager.unsync(snippetId);
     }

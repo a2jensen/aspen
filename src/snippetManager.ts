@@ -199,43 +199,6 @@ export class SnippetsManager {
   }
   
 
-  recomputeDecorations (view: EditorView, snippetId : string): DecorationSet {
-    const builder = new RangeSetBuilder<Decoration>();
-    for (const snippet of this.snippetTracker) {
-      if (this.cellMap.get(view) !== snippet.cell_id) continue;
-      if (snippet.id === snippetId){
-        continue
-      };
-
-      const startLine = view.state.doc.line(snippet.start_line);
-      const endLine = view.state.doc.line(snippet.end_line);
-
-      builder.add(startLine.from, startLine.from, Decoration.line({
-        attributes: { 
-          style: `border-top: 2px solid #FFC0CB; border-left: 2px solid #FFC0CB; border-right: 2px solid #FFC0CB;`,
-          class: 
-          'snippet-start-line',
-          'data-cell-id': snippet.cell_id.toString(), 
-          'data-start-line': snippet.start_line.toString(),
-          'data-end-line': snippet.end_line.toString(),
-          'data-associated-template': snippet.template_id.toString(),
-          'data-snippet-id' : snippet.id.toString()
-        },
-      })
-    );
-
-    builder.add(endLine.from, endLine.from, Decoration.line({
-        attributes: { 
-          style: `border-bottom: 2px solid #FFC0CB; border-left: 2px solid #FFC0CB; border-right: 2px solid #FFC0CB;`,
-          class: 
-          'snippet-end-line',
-          'data-cell-id': snippet.cell_id.toString()
-        },
-      })
-    );
-    }
-    return builder.finish();
-  };
 
   /**
  * Creates decorations to visually highlight snippets in the editor
