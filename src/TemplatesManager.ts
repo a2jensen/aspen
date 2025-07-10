@@ -1,70 +1,64 @@
 /* eslint-disable curly */
 /* eslint-disable @typescript-eslint/quotes */
 /* eslint-disable prettier/prettier */
-import {ContentsManager} from "@jupyterlab/services";
-import {Template} from "./types";
+import { ITemplate, IContentsManager } from "./types";
 
 /**
- * TemplatesManager Class
- * 
  * This class is responsible for managing templates within the application.
  * It handles creation, storage, retrieval, updating, and deletion of templates.
  * Templates are stored both in-memory as an array and persisted as JSON files.
  */
 export class TemplatesManager {
-  /** Array containing all loaded templates */
-  templates: Template[]; // TODO:refactor so it is private! this needs to be done during libWidget refactor
-  
-  /** JupyterLab's ContentsManager to handle file operations */
-  contentsManager: ContentsManager;
+  private templates: ITemplate[];
+  private contentsManager: IContentsManager;
+  private activeHighlights: Set<string> = new Set();
 
-  activeTemplateHighlightIds: Set<string> = new Set();
-
-  /**
-   * Initializes a new instance of the TemplatesManager
-   * Sets up an empty templates array and creates a ContentsManager instance
-   */
-  constructor(contentManager: ContentsManager){
+  constructor(contentManager: IContentsManager){
     this.templates = [];
     this.contentsManager = contentManager;
+    this.activeHighlights = new Set();
   }
 
-  get(templateId: string): Template | undefined {
+  getAll() : ITemplate[] {
+    return this.templates;
+  }
+
+  get(templateId: string) : ITemplate | undefined {
     return this.templates.find(template => template.id === templateId);
+  }
+
+  getActiveHighlights() : Set<string> {
+    return this.activeHighlights;
   }
 
   /**
    * Creates a new template from the provided code snippet
-   * 
    * @param codeSnippet - The code content to be saved as a template
-   * 
-   * 1. Creates a new Template object with a unique timestamp ID
-   * 2. Adds the template to the in-memory array
-   * 3. Persists the template as a JSON file in the /snippets directory
    */
+  async create(codeSnippet: string) : Promise<ITemplate | void> {
+    if (!codeSnippet.trim()){
+      console.error("Empty or whitespace-only string")
+      return;
+    }
 
-  async create(codeSnippet: string) {
-    const template: Template = {
-      id: `${Date.now()}`,  // Use timestamp as unique ID
-      name: `Template ${this.templates.length + 1}`,  // Auto-generate name based on count
+    const template: ITemplate = {
+      id: `${Date.now()}`, 
+      name: `Template ${this.templates.length + 1}`, 
       content: codeSnippet,
       dateCreated: new Date(),
       dateUpdated: new Date(),
       tags: [],
-      color: this.RandomColor()  // Default color
+      color: this.assignColor()  
     }
     this.templates.push(template);
-    this.activeTemplateHighlightIds.add(template.id);
-    console.log("Active template highlight IDs:", this.activeTemplateHighlightIds);
+    this.activeHighlights.add(template.id);
 
-    // saving a file should be asynchronous
     try {
       await this.contentsManager.save(`/snippets/${template.name}.json`, {
         type: "file",
         format: "text",
         content: JSON.stringify(template,null,2)
       });
-      console.log(`Saved ${template.name} to file successfully.`);
       return template;
     }
     catch (error) {
@@ -74,43 +68,50 @@ export class TemplatesManager {
 
   /**
    * Deletes a template from both the in-memory array and filesystem
-   * 
    * @param id - The unique identifier of the template to delete
    * @param name - The name of the template (used for file path construction)
    */
-  delete(templateId : string ){
-    const template = this.get(templateId);
-    if (!template) return;
+  async delete(templateId : string) : Promise<void> {
+    if (!templateId.trim){
+      console.error("Empty or whitespace-only string")
+      return;
+    }
 
-    // Filter out the template with the specified ID
+    const template = this.get(templateId);
+    if (!template){
+      console.error(`Failed to get the requested template ${templateId} within delete`)
+      return;
+    };
+
     this.templates = this.templates.filter(template => template.id !== templateId);
 
-    // Delete the corresponding JSON file
-    this.contentsManager.delete(`/snippets/${template.name}.json`).then(() => {
-      console.log(`Successfully deleted template ${template.name} ${templateId}`);
+    try {
+      await this.contentsManager.delete(`/snippets/${template.name}.json`);
       document.dispatchEvent(new CustomEvent('TemplateDeleted', {
-        detail: {templateID: templateId}
+        detail : {templateID : templateId}
       }));
-    }).catch((error: unknown) => {
+    } catch (error : unknown ) {
       console.error(`Failed to delete template ${template.name} ${templateId}`, error);
-    });
+    }
   }
 
   /**
    * Renames a template and updates its file path
-   * 
    * @param id - The unique identifier of the template to rename
    * @param newName - The new name to assign to the template
-   * 
-   * The method:
-   * 1. Finds the template with the matching ID
-   * 2. Updates its name and dateUpdated properties
-   * 3. Saves the updated template to the original file path
-   * 4. Renames the file to match the new template name
    */
-  rename(templateId: string, newName: string) {
+  async rename(templateId: string, newName: string) : Promise<void> {
+    if (!templateId.trim()) {
+      console.error("Empty or whitespace-only string")
+      return;
+    }
+
     const template = this.get(templateId);
-    if (!template) return;
+    if (!template){
+      console.error(`Failed to get the requested template ${templateId} within rename`)
+      return;
+    };
+
 
     const oldName = template.name;
     const oldPath = `/snippets/${template.name}.json`;
@@ -119,54 +120,57 @@ export class TemplatesManager {
     template.name = newName;
     template.dateUpdated = new Date();
 
-    this.contentsManager.save(oldPath, {
-      type: "file",
-      format: "text",
-      content: JSON.stringify(template, null, 2)
-    }).then(() => {
-        console.log(`Template renamed to ${newName} and saved successfully.`);
-        return this.contentsManager.rename(oldPath, newPath);
-    }).catch((error: unknown) => {
-        console.error(`Error renaming template file for ${oldName}`, error);
-    })
+    try {
+      await this.contentsManager.save(oldPath, {
+        type: "file",
+        format: "text",
+        content: JSON.stringify(template, null, 2)
+      });
+      await this.contentsManager.rename(oldPath, newPath);
+    } catch (error) {
+      console.error(`Error renaming template file for ${oldName}`, error);
+    }
   }
 
   /**
    * Updates the content of an existing template
-   * 
    * @param id - The unique identifier of the template to edit
    * @param newContent - The new content to replace the existing template content
-   * 
-   * The method:
-   * 1. Finds the template with the matching ID
-   * 2. Updates its content and dateUpdated properties
-   * 3. Saves the updated template to its existing file path
    */
-  edit(templateId: string, newContent: string) {
+  async edit(templateId: string, newContent: string) : Promise<void> {
+    if (!templateId.trim()) {
+      console.error("Empty or whitespace-only string")
+      return;
+    }
+
     const template = this.get(templateId);
-    if (!template) return;
+    if (!template){
+      console.error(`Failed to get the requested template ${templateId} within edit`)
+      return;
+    };
+
 
     template.content = newContent;
     template.dateUpdated = new Date();
 
     const filePath = `/snippets/${template.name}.json`;
 
-    this.contentsManager.save(filePath, {
-      type : "file",
-      format: "text",
-      content: JSON.stringify(template, null, 2)
-    }).then(() => {
-      console.log(`Template ${template.name} content updated successfully.`)
-    }).catch((error: unknown) => {
+    try {
+      await this.contentsManager.save(filePath, {
+        type : "file",
+        format: "text",
+        content: JSON.stringify(template, null, 2)
+      })
+    } catch (error : unknown ) {
       console.error("Error updating template content", error);
-    });
+    }
   }
   
   /**
    * Generates a random color for the specific template and its
    * corresponding snippets
    */
-  RandomColor() {
+  assignColor() : string {
     const letters = '0123456789ABCDEF';
     let color = '#';
     for (let i = 0; i < 6; i++) {
@@ -180,13 +184,12 @@ export class TemplatesManager {
    * When first created, it should be on.
    * If toggled off, it is deleted from the list.
    */
-  toggleTemplateColor = (id: string) => {
-    if (this.activeTemplateHighlightIds.has(id)) {
-      this.activeTemplateHighlightIds.delete(id); // turn OFF
+  toggleColor (id: string) : void {
+    if (this.activeHighlights.has(id)) {
+      this.activeHighlights.delete(id); 
     } else {
-      this.activeTemplateHighlightIds.add(id); // turn ON
+      this.activeHighlights.add(id);
     }  
-    // Dispatch an event to notify the editor to update decorations
     document.dispatchEvent(new CustomEvent("Toggle Template Highlight", {
       detail: {templateId: id}
     }));
@@ -194,13 +197,8 @@ export class TemplatesManager {
 
   /**
    * Loads all templates from the filesystem into memory.
-   * 
-   * Used to initialize or refresh the templates array using the persisted JSON files.
-   * It provides data persistence across browser reloads and sessions.
-   * 
    */
-  async loadTemplates() {
-    // Clear existing templates before loading
+  async loadTemplates() : Promise<void> {
     this.templates = [];
 
     try {
@@ -212,18 +210,17 @@ export class TemplatesManager {
             const fileModel = await this.contentsManager.get(file.path);
             const templateData = JSON.parse(fileModel.content as string);
 
-            const template: Template = {
-              id: templateData.id || `${Date.now()}`,  // Use provided ID or generate new one
-              name: templateData.name || file.name,    // Use provided name or filename
-              content: templateData.content || "",     // Use provided content or empty string
+            const template: ITemplate = {
+              id: templateData.id,  
+              name: templateData.name || file.name,  
+              content: templateData.content || "",   
               dateCreated: new Date(templateData.dateCreated || Date.now()),
               dateUpdated: new Date(templateData.dateUpdated || Date.now()),
-              tags: templateData.tags || [],           // Use provided tags or empty array
-              color: templateData.color || "#ffffff"   // Use provided color or default white
+              tags: templateData.tags || [],        
+              color: templateData.color || "#ffffff" 
             };
 
             this.templates.push(template);
-            console.log(`Loaded template: ${template.name}`, template);
           }
           catch (error) {
             console.error(`Error loading or parsing file: ${file.path}`, error);

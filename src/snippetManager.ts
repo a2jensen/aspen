@@ -6,7 +6,7 @@
 import { RangeSetBuilder } from '@codemirror/state';
 import { ContentsManager } from "@jupyterlab/services";
 import { TemplatesManager } from './TemplatesManager';
-import { Snippet } from "./types";
+import { ISnippet } from "./types";
 import {
   Decoration,
   DecorationSet,
@@ -25,7 +25,7 @@ import { getTriggeredByCtrlEnter, setTriggeredByCtrlEnter } from './customkeyBin
  */
 export class SnippetsManager {
   public cellCounter; /** Counter for generating unique cell IDs */
-  public snippetTracker: Snippet[]; /** Array to keep track of all active snippets */
+  public snippetTracker: ISnippet[]; /** Array to keep track of all active snippets */
   public cellMap: Map<EditorView, string>; /** Map to associate editor views with their unique cell IDs */
   //private contentsManager : ContentsManager;
   private templatesManager : TemplatesManager;
@@ -222,7 +222,7 @@ export class SnippetsManager {
     
     const snippetsInCell = this.snippetTracker
     .filter(s => s.cell_id === cellID)
-    .filter(s => this.templatesManager.activeTemplateHighlightIds.has(s.template_id))
+    .filter(s => this.templatesManager.getActiveHighlights().has(s.template_id))
     .sort((a, b) => a.start_line - b.start_line);
 
     //goes through the snippetTracker and checks startline/endline for each
@@ -281,7 +281,7 @@ export class SnippetsManager {
   editAll = ( templateId : string , templateContent : string ) => {
     // use the cell id and start / end lines to apply changes in the DOM.
     // returns array of snippets
-    let snippets : Snippet[] = this.snippetTracker.filter(snippet => snippet.template_id === templateId) // ERROR HERE
+    let snippets : ISnippet[] = this.snippetTracker.filter(snippet => snippet.template_id === templateId) // ERROR HERE
     console.log("Found the following snippet instances to update", snippets)
 
     for (const snippet of snippets){

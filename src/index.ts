@@ -39,6 +39,7 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   libraryWidget.id = "jupyterlab-librarywidget-sidebarRight";
   libraryWidget.title.iconClass = "jp-SideBar-tabIcon"; 
   libraryWidget.title.caption = "Library display of templates";
+  await libraryWidget.loadTemplates();
   
   /**
    * Event Listener for when a template is copied from the library.
@@ -80,23 +81,23 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   commands.addCommand("templates:create", {
     label: "Save Code Snippet",
     execute: async () => {
-      const snippet: string = window.getSelection()?.toString() || "";
-      if (snippet) {
-        const template = await libraryWidget.createTemplate(snippet);
-        
-        if (template) {
-          document.dispatchEvent(new CustomEvent("Save Code Snippet", {
-            detail: {
-              snippetText: snippet,
-              templateID: template.id
+        try {
+            const snippet: string = window.getSelection()?.toString() || "";
+            if (snippet) {
+              const template = await libraryWidget.createTemplate(snippet);
+          
+              if (template) {
+                document.dispatchEvent(new CustomEvent("Save Code Snippet", {
+                  detail: {
+                    snippetText: snippet,
+                    templateID: template.id
+                  }
+                }));
             }
-          }));
-          console.log("Event Listener Dispatched.");
         }
-        else {
+        } catch ( error : unknown ) {
           console.error("Template creation failed.")
         }
-      }
     },
   });
 
@@ -214,7 +215,6 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
     rank: 1
   });
   
-  await libraryWidget.loadTemplates(); // load the templates before adding the LibraryWidget
   /** Registers Library Widget to the right sidebar. */
   app.shell.add(libraryWidget, "right", {rank: 300});
 

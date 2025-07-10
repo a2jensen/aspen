@@ -6,13 +6,11 @@ import {useState} from "react";
 import "../style/index.css";
 import "../style/base.css";
 import {copyIcon, editIcon, deleteIcon, caretDownIcon, caretRightIcon} from "@jupyterlab/ui-components";
-import {Template, Snippet} from "./types";
+import {ITemplate, ISnippet} from "./types";
 import {TemplatesManager} from "./TemplatesManager";
 import {SnippetsManager} from "./snippetManager";
 
-/**
- * React Library Component.
- */
+
 function Library({
   templates,
   snippets,
@@ -23,8 +21,8 @@ function Library({
   activeTemplateHighlightIds,
   lastCreatedTemplateId
 }: {
-  templates: Template[],
-  snippets: Snippet[],
+  templates: ITemplate[],
+  snippets: ISnippet[],
   deleteTemplate: (id: string, name: string) => void,
   renameTemplate: (id: string, name: string) => void,
   editTemplate: (id: string, name: string) => void,
@@ -53,14 +51,14 @@ function Library({
     }
   }, [lastCreatedTemplateId]);
 
-  const handleDragStart = (event: React.DragEvent<HTMLDivElement>, template: Template) => {
+  const handleDragStart = (event: React.DragEvent<HTMLDivElement>, template: ITemplate) => {
     //added a line before and after the content in order to be able to get out of template, issue still there tho if we delete it it wont work
     event.dataTransfer.setData("text/plain", "\n" + template.content + "\n");
     event.dataTransfer.setData("application/json", JSON.stringify(template)); // Store full template info
     event.dataTransfer.effectAllowed = "copy";
   };
 
-  const handleCopy = (template: Template) => {
+  const handleCopy = (template: ITemplate) => {
     const jsonData = JSON.stringify(template);
     const parsedData = JSON.parse(jsonData);
     
@@ -70,7 +68,7 @@ function Library({
     });
   }
 
-  const handleRenameStart = (template: Template) => {
+  const handleRenameStart = (template: ITemplate) => {
     setRenamingId(template.id); // enter renaming mode
     setNewName(template.name); // current name is prefilled
   }
@@ -86,7 +84,7 @@ function Library({
     setRenamingId(null); // exit renaming mode
   }
 
-  const handleEditStart = (template: Template) => {
+  const handleEditStart = (template: ITemplate) => {
     setEditingId(template.id); // enter editing mode
     setNewContent(template.content); // current content is prefilled
     console.log("editing mode");
@@ -219,8 +217,6 @@ function Library({
 
 /**
  * LibraryWidget extends ReactWidget, which in turn extends Widget.
- * Widget is a core component of the Lumino library.
- * 
  * This class manages the template connection as well as renders the Library react component
  */
 export class LibraryWidget extends ReactWidget {
@@ -235,50 +231,72 @@ export class LibraryWidget extends ReactWidget {
     this.snippetsManager = snippetsManager;
   }
 
-  async createTemplate(codeSnippet: string): Promise<Template | undefined> {
-    const template = await this.templateManager.create(codeSnippet);
-    if (template) {
-      this.lastCreatedTemplateId = template.id;
+  async createTemplate(codeSnippet: string) : Promise<ITemplate | void> {
+    try {
+      const template = await this.templateManager.create(codeSnippet);
+      if (template) {
+        this.lastCreatedTemplateId = template.id;
+      }
+      this.update();
+      return template;
+    } catch ( error : unknown ){
+      console.error(`Failed to create template`, error)
+      this.update();
     }
-    this.update();
-    return template;
   }
 
-  deleteTemplate = (id: string) => {
-    this.templateManager.delete(id);
-    this.update();
+  // Adding async/await to this function causes a delay in the instance being deleted from the UI.
+  deleteTemplate = (id: string) : void => {
+    try {
+      this.templateManager.delete(id);
+      this.update();
+    } catch (error: unknown) {
+      console.error("Failed to delete templates - LibWidget call", error);
+    }
+  }
+  
+
+  renameTemplate = async (id: string, newName: string) : Promise<void> => {
+    try{
+      await this.templateManager.rename(id, newName);
+      this.update();
+    } catch (error : unknown ) {
+      console.error("Failed to rename template - LibWidget call", error);
+    }
   }
 
-  renameTemplate = (id: string, newName: string) => {
-    this.templateManager.rename(id, newName);
-    this.update();
+  editTemplate = async (id: string, newContent: string) : Promise<void> => {
+    try {
+      await this.templateManager.edit(id, newContent);
+      this.update();
+    } catch ( error : unknown ){
+      console.error("Failed to edit template - LibWidget call", error);
+    }
   }
 
-  editTemplate = (id: string, newContent: string) => {
-    this.templateManager.edit(id, newContent);
-    this.update();
+  async loadTemplates() : Promise<void> {
+    try {
+      await this.templateManager.loadTemplates();
+      this.update();
+    } catch ( error : unknown ) {
+      console.error("Failed to load templates - LibWidget")
+    }
   }
 
-  toggleTemplateColor = (id: string) => {
-    this.templateManager.toggleTemplateColor(id);
-    this.update();
-  }
-
-  async loadTemplates() {
-    await this.templateManager.loadTemplates();
+  toggleTemplateColor = (id: string) : void => {
+    this.templateManager.toggleColor(id);
     this.update();
   }
 
   render() {
-    console.log("RENDERING LIBRARY WIDGET", this.templateManager.templates);
     return <Library
-      templates={this.templateManager.templates}
+      templates={this.templateManager.getAll()}
       snippets={this.snippetsManager.snippetTracker}
       deleteTemplate={this.deleteTemplate}
       renameTemplate={this.renameTemplate}
       editTemplate={this.editTemplate}
       toggleTemplateColor={this.toggleTemplateColor}
-      activeTemplateHighlightIds={this.templateManager.activeTemplateHighlightIds}
+      activeTemplateHighlightIds={this.templateManager.getActiveHighlights()}
       lastCreatedTemplateId={this.lastCreatedTemplateId}
     />;
   }

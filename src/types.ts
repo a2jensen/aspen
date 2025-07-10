@@ -1,3 +1,4 @@
+import { Contents } from "@jupyterlab/services"
 
 /**
  * @type id : string -  ID associated with the template, generated through`${DateNow()}`
@@ -9,7 +10,7 @@
  * @type color : string  - Color associated with the template - not implemented as of 3/5/25
  * @type : connections : string[] - Tracks associated snippet instances - not implemented as of 3/5/25 and may need refactoring
  */
-export interface Template {
+export interface ITemplate {
   id: string;
   name: string;
   content: string;
@@ -26,7 +27,7 @@ export interface Template {
 * @type end_line : number - ending line number in view/editor
 * @type template_id : string - reference to associated templateID
 */
-export interface Snippet {
+export interface ISnippet {
   id: string;
   notebook_id : string;
   cell_id: string;
@@ -34,4 +35,13 @@ export interface Snippet {
   start_line: number;
   end_line: number;
   template_id: string;
+  }
+
+
+  // exposing the only needed methods from the ContentsManager API.
+  export interface IContentsManager {
+    save(path: string, options?: (Partial<Contents.IModel> & Partial<Contents.IContentProvisionOptions>)) : Promise<Contents.IModel>
+    delete(path : string) : Promise<void>
+    get(path: string, options?: Contents.IFetchOptions | undefined): Promise<Contents.IModel>
+    rename(path: string, newPath: string): Promise<Contents.IModel>
   }
