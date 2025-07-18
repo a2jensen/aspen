@@ -36,6 +36,7 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   const snippetsManager = new SnippetsManager(contentsManager, templatesManager);
   const libraryWidget = new LibraryWidget(templatesManager, snippetsManager);
   const synchronization = new Synchronization(templatesManager, snippetsManager, libraryWidget);
+  libraryWidget.setSynchronization(synchronization)
   libraryWidget.id = "jupyterlab-librarywidget-sidebarRight";
   libraryWidget.title.iconClass = "jp-SideBar-tabIcon"; 
   libraryWidget.title.caption = "Library display of templates";

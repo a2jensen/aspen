@@ -9,7 +9,7 @@ import {copyIcon, editIcon, deleteIcon, caretDownIcon, caretRightIcon} from "@ju
 import {ITemplate, ISnippet} from "./types";
 import {TemplatesManager} from "./TemplatesManager";
 import {SnippetsManager} from "./snippetManager";
-
+import {Synchronization} from "./Synchronization";
 
 function Library({
   templates,
@@ -17,6 +17,7 @@ function Library({
   deleteTemplate,
   renameTemplate,
   editTemplate,
+  syncTemplate,
   toggleTemplateColor,
   activeTemplateHighlightIds,
   lastCreatedTemplateId
@@ -26,6 +27,7 @@ function Library({
   deleteTemplate: (id: string, name: string) => void,
   renameTemplate: (id: string, name: string) => void,
   editTemplate: (id: string, name: string) => void,
+  syncTemplate: (id: string, newContent : string) => void,
   toggleTemplateColor: (id: string) => void,
   activeTemplateHighlightIds: Set<string>,
   lastCreatedTemplateId?: string
@@ -99,6 +101,7 @@ function Library({
   const handleEditConfirm = (id: string) => {
     if (newContent.trim() !== "") {
       editTemplate(id, newContent.trim());
+      syncTemplate(id, newContent)
     }
     setEditingId(null); // exit editing mode
   }
@@ -222,6 +225,7 @@ function Library({
 export class LibraryWidget extends ReactWidget {
   templateManager: TemplatesManager;
   snippetsManager: SnippetsManager;
+  synchronizeManager? : Synchronization;
   lastCreatedTemplateId?: string;
 
   constructor(templatesManager: TemplatesManager, snippetsManager: SnippetsManager) {
@@ -288,6 +292,15 @@ export class LibraryWidget extends ReactWidget {
     this.update();
   }
 
+  syncTemplate =  (id : string, newContent : string) : void => {
+    this.synchronizeManager?.synch(id, newContent, false)
+  }
+
+  // created a setter function since there was a deadlock in init in index
+  setSynchronization ( synchronization : Synchronization) {
+    this.synchronizeManager = synchronization
+  }
+
   render() {
     return <Library
       templates={this.templateManager.getAll()}
@@ -295,6 +308,7 @@ export class LibraryWidget extends ReactWidget {
       deleteTemplate={this.deleteTemplate}
       renameTemplate={this.renameTemplate}
       editTemplate={this.editTemplate}
+      syncTemplate={this.syncTemplate}
       toggleTemplateColor={this.toggleTemplateColor}
       activeTemplateHighlightIds={this.templateManager.getActiveHighlights()}
       lastCreatedTemplateId={this.lastCreatedTemplateId}
