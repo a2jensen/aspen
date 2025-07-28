@@ -36,34 +36,40 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
       if (!currentView) {
         console.warn("No active editor view available");
         return;
-        }
-        const selection = currentView.state.selection.main;
-        const startLine = currentView.state.doc.lineAt(selection.from).number;
-        const endLine = currentView.state.doc.lineAt(selection.to).number;
-        const droppedText = currentView.state.sliceDoc(selection.from, selection.to).trim();    
-        if (!droppedText) {
-          console.warn("Skipping empty snippet");
-          return; // Do not create an empty snippet
-          }
+      }
+      const selection = currentView.state.selection.main;
+      const startLine = currentView.state.doc.lineAt(selection.from).number;
+      const endLine = currentView.state.doc.lineAt(selection.to).number;
+      const droppedText = currentView.state.sliceDoc(selection.from, selection.to).trim();    
+      if (!droppedText) {
+        console.warn("Skipping empty snippet");
+        return; // Do not create an empty snippet
+      }
           
-        setTimeout(() => {
-          snippetsManager.update(currentView!);
-          if (!notebookTracker?.currentWidget?.context?.path){
-            console.error("Failed to capture the cell ID of the currently active cell.")
-            return;
-          }
-          if (!notebookTracker?.currentWidget?.content.activeCell?.model.id){
-            console.error("Failed to capture the cell ID of the currently active cell.")
-            return;
-          }
+      setTimeout(() => {
+        snippetsManager.update(currentView!);
+        if (!notebookTracker?.currentWidget?.context?.path){
+          console.error("Failed to capture the cell ID of the currently active cell.")
+          return;
+        }
+        if (!notebookTracker?.currentWidget?.content.activeCell?.model.id){
+          console.error("Failed to capture the cell ID of the currently active cell.")
+          return;
+        }
 
-          const cellId : string = notebookTracker.currentWidget.content.activeCell.model.id;
-          const notebookId : string = notebookTracker.currentWidget.context.path
-          snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
+        const cellId : string = notebookTracker.currentWidget.content.activeCell.model.id;
+        const notebookId : string = notebookTracker.currentWidget.context.path
+        snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
+        
+        // unselect the text
+        const cursorPos = selection.to;
+        currentView!.dispatch({
+          selection: { anchor: cursorPos },
+          scrollIntoView: true
+        });
 
-          snippetsManager.assignDecorations(currentView!);
-          }, 10);
-
+        snippetsManager.assignDecorations(currentView!);
+      }, 10);
      });
     }
 

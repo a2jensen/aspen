@@ -31,11 +31,19 @@ function Library({
   lastCreatedTemplateId?: string
 }) {
   console.log("Library received templates:", templates);
-  const [expandedTemplates, setExpandedTemplates] = useState<{[key: string]: boolean}>({});
+  //const [expandedTemplates, setExpandedTemplates] = useState<{[key: string]: boolean}>({});
+  const [expandedTemplates, setExpandedTemplates] = useState(() => {
+    const initExpandedTemplates: {[templateId: string]: boolean} = {};
+    templates.forEach(template => {
+      initExpandedTemplates[template.id] = true;
+    });
+    return initExpandedTemplates;
+  });
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [newName, setNewName] = useState<string>("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newContent, setNewContent] = useState<string>("");
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   const toggleTemplate = (id: string) => {
     setExpandedTemplates((prev) => ({
@@ -84,9 +92,22 @@ function Library({
     setRenamingId(null); // exit renaming mode
   }
 
+  // set cursor to end of template when editing
+  React.useEffect(() => {
+    if (editingId && textareaRef.current) {
+      const textarea = textareaRef.current;
+      const length = textarea.value.length;
+      textarea.focus();
+      textarea.setSelectionRange(length, length);
+    }
+  }, [editingId]);
+
   const handleEditStart = (template: ITemplate) => {
     setEditingId(template.id); // enter editing mode
     setNewContent(template.content); // current content is prefilled
+    if (!expandedTemplates[template.id]) { // toggle template open if collapsed
+      toggleTemplate(template.id);
+    }
     console.log("editing mode");
   }
 
@@ -134,7 +155,7 @@ function Library({
 
               <div className="template-buttons">
                 <button 
-                  className={`template-toggle ${activeTemplateHighlightIds.has(template.id) ? "template-highlight-active" : ""}`}
+                  className={`template-toggle-highlight ${activeTemplateHighlightIds.has(template.id) ? "template-highlight-active" : ""}`}
                   title={activeTemplateHighlightIds.has(template.id) ? "Hide highlights" : "Show highlights"} 
                   onClick={() => {
                     toggleTemplateColor(template.id);
@@ -151,7 +172,6 @@ function Library({
                 <button className="template-edit" title="Edit template" onClick={() => handleEditStart(template)}>
                   <editIcon.react tag="span" height="16px" width="16px"/>
                 </button>
-
                 <button className="template-delete" title="Delete template" onClick={() => deleteTemplate(template.id, template.name)}>
                   <deleteIcon.react tag="span" height="16px" width="16px"/>
                 </button>
@@ -172,6 +192,7 @@ function Library({
               
                 {editingId === template.id ? (
                   <textarea
+                    ref={textareaRef}
                     className="edit-content-textarea"
                     value={newContent}
                     onChange={handleEditChange}
