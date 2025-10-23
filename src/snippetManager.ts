@@ -1,5 +1,4 @@
 /* eslint-disable prefer-const */
-/* eslint-disable eqeqeq */
 /* eslint-disable curly */
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/quotes */
@@ -16,6 +15,7 @@ import {
 import { getTriggeredByCtrlEnter, setTriggeredByCtrlEnter } from './customkeyBinds';
 
 
+
 /**
  * SnippetsManager Class
  * 
@@ -24,29 +24,28 @@ import { getTriggeredByCtrlEnter, setTriggeredByCtrlEnter } from './customkeyBin
  * It maintains the connection between snippet/template instances in the editor and their templates.
  */
 export class SnippetsManager {
-  public cellCounter; /** Counter for generating unique cell IDs */
   public snippetTracker: ISnippet[]; /** Array to keep track of all active snippets */
-  public cellMap: Map<EditorView, string>; /** Map to associate editor views with their unique cell IDs */
-  //private contentsManager : ContentsManager;
+  public cellMap: Map<string,EditorView>; /** Map to associate editor views with their unique cell IDs */
   private templatesManager : TemplatesManager;
+
   /**
    * Initializes a new instance of the SnippetsManager
    */
-  constructor( contentsManager : ContentsManager, templates : TemplatesManager ){
+  constructor( contentsManager : ContentsManager, templates : TemplatesManager
+ ){
     this.snippetTracker = [];
     this.cellMap = new Map();
-    this.cellCounter = 0;
     this.templatesManager = templates;
+    
 
-    /**Purpose: If the template is deleted it will call deleteSnippets */
-    document.addEventListener('TemplateDeleted', (event: Event) => {
+  /**Purpose: If the template is deleted it will call deleteSnippets */
+  document.addEventListener('TemplateDeleted', (event: Event) => {
     const customEvent = event as CustomEvent;
     const templateID = customEvent.detail.templateID;
 
     this.deleteSnippetsByTemplate(templateID);
   });
   }
-
 
   /**
    * Assigns a unique cell ID to an editor view
@@ -57,12 +56,13 @@ export class SnippetsManager {
    * If the view already has an ID, returns the existing ID.
    * Otherwise, increments the counter and assigns a new ID.
    */
-  assignCellID(view : EditorView, cell_id : string) {
-    if(!this.cellMap.has(view)) {
-      this.cellMap.set(view, cell_id);
+  assignCellID( cell_id : string, view : EditorView) {
+    if(!this.cellMap.has(cell_id)) {
+      this.cellMap.set(cell_id, view);
     }
-    return this.cellMap.get(view);
+    return cell_id;
   }
+
 
   /**
    * Creates a new snippet instance in the editor
@@ -76,8 +76,9 @@ export class SnippetsManager {
    * Method is called when a template is dropped or pasted into the editor.
    * It creates a new Snippet object and adds it to the snippetTracker.
    */
+
   create(view: EditorView, startLine: number, endLine: number, templateID: string, content: string, notebookId : string, cellIndex : string){
-    const cellID = this.assignCellID(view, cellIndex);
+    const cellID = this.assignCellID(cellIndex,view);
     const snippet = {
       id: `${Date.now()}`,
       notebook_id : notebookId,
@@ -87,7 +88,6 @@ export class SnippetsManager {
       end_line: endLine,
       template_id: templateID
     }
-    console.log("Snippet object being created: ", snippet);
     this.snippetTracker.push(snippet);
   }
 
@@ -111,7 +111,6 @@ export class SnippetsManager {
     console.log(`Snippets remaining after delete:`, this.snippetTracker);
   }
 
-  //UNLESS I MAKE UPDATE TAKE IN ANOTHER VARABLE BEING EXIT SNIPPET AND IF ITS TRUE THEN DONT EXPAND AND SAME WITH THE OTHER THING???
   /**
    * Updates all snippet line positions after editor changes
    * 
@@ -128,15 +127,12 @@ export class SnippetsManager {
    * 
    * TODO: Update the content of the snippets as well, not just their positions
    */
-  update(view: EditorView, update?: ViewUpdate) {
+  update(cell_id: string, view: EditorView, update?: ViewUpdate) {
       if (!update) return;
-      const cellID = this.cellMap.get(view);
-      if (!cellID) return;
   
       const oldDoc = update.startState.doc; //this is the previous editor state
       const newDoc = update.state.doc;     
       const newTotalLines = newDoc.lines; 
-      
       //from A and to A are the new things that were added, so we checking it with old doc to see what was inserted and what was not
       update.changes.iterChanges((fromA, toA, fromB, toB, insertedText) => {
         const insertedLines = insertedText.toString().split("\n").length - 1; //how many new line inerted
@@ -144,7 +140,8 @@ export class SnippetsManager {
     
         for (const snippet of this.snippetTracker) {
           let { start_line, end_line } = snippet;
-          if (snippet.cell_id !== cellID) continue; 
+          if (snippet.cell_id !== cell_id) continue; 
+
           //  Text inserted above 
           if (fromA < oldDoc.line(start_line).from) {
             start_line += insertedLines - removedLines;
@@ -176,13 +173,6 @@ export class SnippetsManager {
           const endPos = newDoc.line(end_line).to;
           const updatedSnippet = newDoc.sliceString(startPos, endPos);
           snippet.content = updatedSnippet;
-
-          console.log("Updated Snippet content", {
-            snippet_id : snippet.template_id,
-            start_line,
-            end_line,
-            contentLength : updatedSnippet.length
-          })
         }
       });
     }
@@ -200,7 +190,8 @@ export class SnippetsManager {
   
 
 
-  /**
+
+/**
  * Creates decorations to visually highlight snippets in the editor
  * 
  * @param view - The editor view to apply decorations to
@@ -211,29 +202,21 @@ export class SnippetsManager {
 * It also applies a button to the 
 * 
 * Potential enhancements:
-* - Use different border colors based on the template type
 * - Implement different color schemes for dark and light editor modes
 * 
  */
-  assignDecorations(view: EditorView): DecorationSet {
-    const cellID = this.cellMap.get(view);
-    if (!cellID) return Decoration.none;
+  assignDecorations(view: EditorView, cell_id?: string): DecorationSet {
     const builder = new RangeSetBuilder<Decoration>();
-    
+
     const snippetsInCell = this.snippetTracker
-    .filter(s => s.cell_id === cellID)
+    .filter(s => s.cell_id === cell_id)
     .filter(s => this.templatesManager.getActiveHighlights().has(s.template_id))
     .sort((a, b) => a.start_line - b.start_line);
-
     //goes through the snippetTracker and checks startline/endline for each
     for (const snippet of snippetsInCell) {
       const startLine = view.state.doc.line(snippet.start_line);
       const endLine = view.state.doc.line(snippet.end_line);
       
-      // Remove empty snippets (where start line equals end line)
-      if (startLine == endLine) {
-        continue;
-      }
       const template = this.templatesManager.get(snippet.template_id);
       const borderColor = template ? template.color : undefined;
 
@@ -276,13 +259,17 @@ export class SnippetsManager {
     // TODO: Implementation needed
   }
 
+//i need the editor view here :o , maybe pass the view here
+//would it be reduant to have a hashmap of cellid and view if i get the view to get the cell id in order to call the function?
+//Issue when i move up or down the cell the view does not allow it to push to all instances
+//so issue is the editor view perchance but i need the view in order to edit it\
 
   // Arrow functions automatically bind this to the instance where they were defined.
   editAll = ( templateId : string , templateContent : string ) => {
     // use the cell id and start / end lines to apply changes in the DOM.
     // returns array of snippets
     let snippets : ISnippet[] = this.snippetTracker.filter(snippet => snippet.template_id === templateId) // ERROR HERE
-    console.log("Found the following snippet instances to update", snippets)
+      console.log("CellMap",this.cellMap);
 
     for (const snippet of snippets){
       if (!snippet) {
@@ -291,13 +278,19 @@ export class SnippetsManager {
       }
   
       // find the editor view ID for the cell
+      //i can get the snippets and the view maybe i get it from snych?? but i need all different views
+      //because i need to update it 
+      //i need to save the correct view as well that is corresponding to that cellid - possibility try and save the editor view
+      //I am accessiing the cell id so therefore the view should be there and should propagate if its the same thing?
       let targetView : EditorView | undefined;
-      for (const [view, cellId] of this.cellMap.entries()) {
+      for (const [cellId, view] of this.cellMap.entries()) {
         if (cellId === snippet.cell_id) {
           targetView = view;
+          console.log("Target View + CellId",targetView, cellId);
           break;
         }
       }
+      
   
       if (!targetView) {
         console.log(`Editor view for cell ID ${snippet} not found`)

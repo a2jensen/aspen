@@ -39,6 +39,7 @@ function Library({
     });
     return initExpandedTemplates;
   });
+
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [newName, setNewName] = useState<string>("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -61,7 +62,7 @@ function Library({
 
   const handleDragStart = (event: React.DragEvent<HTMLDivElement>, template: ITemplate) => {
     //added a line before and after the content in order to be able to get out of template, issue still there tho if we delete it it wont work
-    event.dataTransfer.setData("text/plain", "\n" + template.content + "\n");
+    event.dataTransfer.setData("text/plain", template.content);
     event.dataTransfer.setData("application/json", JSON.stringify(template)); // Store full template info
     event.dataTransfer.effectAllowed = "copy";
   };

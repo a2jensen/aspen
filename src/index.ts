@@ -1,3 +1,4 @@
+/* eslint-disable curly */
 /* eslint-disable @typescript-eslint/quotes */
 /* eslint-disable prettier/prettier */
 /**
@@ -17,6 +18,14 @@ import {Synchronization} from "./Synchronization";
 import {CodeMirrorExtension} from "./CodeMirrorPlugin";
 import {IEditorExtensionRegistry} from "@jupyterlab/codemirror"; // Interface for registering CodeMirror Extensions
 import {INotebookTracker} from "@jupyterlab/notebook";
+import { Cell } from '@jupyterlab/cells';
+
+
+function addCellIdAttribute(cell: Cell): void {
+  if (!cell.model || !cell.node) {return;}
+  const cellId = cell.model.id;
+  cell.node.setAttribute('data-cell-id', cellId);
+}
 
 /**
  * Activation function for our extension. Function is called
@@ -40,7 +49,26 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   libraryWidget.title.iconClass = "jp-SideBar-tabIcon"; 
   libraryWidget.title.caption = "Library display of templates";
   await libraryWidget.loadTemplates();
+
+  notebookTracker.widgetAdded.connect((_, notebookPanel) => {
+    notebookPanel.content.widgets.forEach(cell => {
+    addCellIdAttribute(cell);
+  });
+
+  notebookPanel.content.model?.cells.changed.connect((_, change) => {
+    if (change.type === 'add') {
+      change.newValues.forEach((_, i) => {
+        const cell = notebookPanel.content.widgets[change.newIndex + i];
+        addCellIdAttribute(cell);
+      });
+    }
+  });
+
+});
+
+
   
+
   /**
    * Event Listener for when a template is copied from the library.
    * Before getting saved to the clipboard, we want to attach a marker as well as its ID onto it in JSON format.
@@ -60,17 +88,14 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
    */
   document.addEventListener("dragstart", (event) => {
     const dragInfo = event.target as HTMLElement;
-    console.log("What's getting dragged, ", dragInfo);
 
     if (dragInfo.classList.contains("template-snippet")) {
-      console.log("What's getting dragged is a template");
 
       const templateData = {
         marker: "aspen-template",
         templateID: dragInfo.getAttribute("data-template-id"),
         content: dragInfo.innerText
       }
-      console.log("Data that will be set onto the dataTransfer", templateData);
       event.dataTransfer?.setData("application/json", JSON.stringify(templateData));
     }
   })
@@ -78,28 +103,37 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   /**
    * Adding command that allows their highlighted code to be saved as a template.
    */
-  commands.addCommand("templates:create", {
-    label: "Save Code Snippet",
-    execute: async () => {
-        try {
-            const snippet: string = window.getSelection()?.toString() || "";
-            if (snippet) {
-              const template = await libraryWidget.createTemplate(snippet);
-          
-              if (template) {
-                document.dispatchEvent(new CustomEvent("Save Code Snippet", {
-                  detail: {
-                    snippetText: snippet,
-                    templateID: template.id
-                  }
-                }));
-            }
-        }
-        } catch ( error : unknown ) {
-          console.error("Template creation failed.")
-        }
-    },
-  });
+commands.addCommand("templates:create", {
+  label: "Save Code Snippet",
+  execute: async () => {
+    try {
+      const snippet = window.getSelection()?.toString().trim() || "";
+      if (!snippet) {
+        console.warn("No code snippet selected.");
+        return;
+      }
+
+      const template = await libraryWidget.createTemplate(snippet);
+      if (!template) {
+        console.error("Failed to create template.");
+        return;
+      }
+
+      document.dispatchEvent(
+        new CustomEvent("Save Code Snippet", {
+          detail: {
+            snippetText: snippet,
+            templateID: template.id
+          }
+        })
+      );
+
+      console.log("Snippet saved successfully:", template.id);
+    } catch (error: unknown) {
+      console.error("Template creation failed:", error);
+    }
+  }
+});
 
   commands.addCommand("templates:push", {
     label: "Push Changes To Template",
@@ -113,20 +147,15 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
        * Query the highlighted DOM and check if the instance is within it
        */
       const range = content.getRangeAt(0);
-      console.log("range ", range);
       // https://developer.mozilla.org/en-US/docs/Web/API/Range/cloneContents
       const fragment = range.cloneContents(); // DOM fragment of the selection, making a deep copy of DOM so we don't directly edit the base DOM
-      console.log("range cloned contented : ", fragment)
 
       // Create a temporary wrapper to check for class names, acts as a temporary "mini-DOM" where we can make edits
       const tempDiv = document.createElement("div");
-      console.log("tempDiv init ", tempDiv);
       tempDiv.appendChild(fragment);
-      console.log("tempDiv after appending : ", fragment)
 
       const startCheck = tempDiv.querySelector(".snippet-start-line");
       const endCheck = tempDiv.querySelector(".snippet-end-line");
-      console.log(`Start and end check ${startCheck} AND ${endCheck}`);
       
       
       if (startCheck && endCheck) {
@@ -134,15 +163,12 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
          * Grab the needed data and pass it into the synch function
          */
         const templateId = startCheck?.getAttribute("data-associated-template");
-        console.log("templateId var: ", templateId);
 
         // Get all lines inside the tempDiv / highlighted snippet
         const codeLines = Array.from(tempDiv.querySelectorAll('.cm-line'))
           .map(lineEl => (lineEl as HTMLElement).innerText.trimEnd());
         const innerText = codeLines.join("\n"); // Explicitly join lines with \n
 
-        console.log("templateId var: ", templateId);
-        console.log("Reconstructed inner text with newlines:\n", innerText);
 
         if (templateId) {
           // temporary fix, do something like LibraryWidget.synch. similar to create above
@@ -214,6 +240,7 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
     selector: '.jp-Notebook',
     rank: 1
   });
+
   
   /** Registers Library Widget to the right sidebar. */
   app.shell.add(libraryWidget, "right", {rank: 300});

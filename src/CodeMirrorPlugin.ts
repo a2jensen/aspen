@@ -17,6 +17,20 @@ import { INotebookTracker } from "@jupyterlab/notebook"
 // Create a global flag to track if the event listener has been registered
 let saveSnippetListenerRegistered = false;
 let currentView: EditorView | null = null;
+
+ function getCellIdFromEditor(view: EditorView | undefined): string | undefined {
+  if (!view) {
+    console.warn("EditorView is undefined — cannot get cell ID");
+    return undefined;
+  }
+  const cellElement = view.dom.closest('[data-cell-id]');
+  if (!cellElement) {
+    console.warn("Unable to find the cellElement");
+    return undefined;
+  }
+  return cellElement.getAttribute('data-cell-id') ?? undefined;
+}
+
 /**
  * 
  * This serves as the main entry point for integrating CodeMirror into the ASPEN extension.
@@ -31,47 +45,61 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
     saveSnippetListenerRegistered = true;
 
     // This event listener will now be registered only once
-    document.addEventListener('Save Code Snippet', (event) => {
-    const templateID = (event as CustomEvent).detail.templateID;
-      if (!currentView) {
-        console.warn("No active editor view available");
-        return;
-      }
-      const selection = currentView.state.selection.main;
-      const startLine = currentView.state.doc.lineAt(selection.from).number;
-      const endLine = currentView.state.doc.lineAt(selection.to).number;
-      const droppedText = currentView.state.sliceDoc(selection.from, selection.to).trim();    
-      if (!droppedText) {
-        console.warn("Skipping empty snippet");
-        return; // Do not create an empty snippet
-      }
-          
-      setTimeout(() => {
-        snippetsManager.update(currentView!);
-        if (!notebookTracker?.currentWidget?.context?.path){
-          console.error("Failed to capture the cell ID of the currently active cell.")
-          return;
-        }
-        if (!notebookTracker?.currentWidget?.content.activeCell?.model.id){
-          console.error("Failed to capture the cell ID of the currently active cell.")
+    document.addEventListener(
+      "Save Code Snippet",
+      (event: Event) => {
+        const { templateID } = (event as CustomEvent<{ templateID: string }>).detail;
+
+        if (!currentView) {
+          console.warn("No active editor view available");
           return;
         }
 
-        const cellId : string = notebookTracker.currentWidget.content.activeCell.model.id;
-        const notebookId : string = notebookTracker.currentWidget.context.path
-        snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
-        
-        // unselect the text
+        const selection = currentView.state.selection.main;
+        const startLine = currentView.state.doc.lineAt(selection.from).number;
+        const endLine = currentView.state.doc.lineAt(selection.to).number;
+        const droppedText = currentView.state.sliceDoc(selection.from, selection.to).trim();
+
+        if (!droppedText) {
+          console.warn("Skipping empty snippet");
+          return;
+        }
+
+        setTimeout(() => {
+          const notebookWidget = notebookTracker?.currentWidget;
+          const notebookPath = notebookWidget?.context?.path;
+          const activeCellId = notebookWidget?.content?.activeCell?.model?.id;
+
+          if (!notebookPath || !activeCellId) {
+            console.error("Failed to capture notebook or cell ID.");
+            return;
+          }
+
+          const cellId = getCellIdFromEditor(currentView!);
+          if (!cellId) return;
+
+          snippetsManager.update(cellId, currentView!);
+          snippetsManager.create(
+            currentView!,
+            startLine,
+            endLine,
+            templateID,
+            droppedText,
+            notebookPath,
+            cellId
+          );
+          snippetsManager.assignDecorations(currentView!, cellId);
+        }, 10);
+
         const cursorPos = selection.to;
-        currentView!.dispatch({
+        currentView.dispatch({
           selection: { anchor: cursorPos },
           scrollIntoView: true
         });
-
-        snippetsManager.assignDecorations(currentView!);
-      }, 10);
-     });
-    }
+      },
+      false
+    );
+      }
 
   const viewPlugin = ViewPlugin.fromClass(
     class {
@@ -124,11 +152,9 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
           const startLine = view.state.doc.lineAt(dropPos).number;
           const endLine = startLine + droppedText.split('\n').length - 1;
           const templateID = parsedText.templateID;
-  
           
 
           setTimeout(() => {
-            snippetsManager.update(view);
             if (!notebookTracker?.currentWidget?.context?.path){
               console.error("Failed to capture the cell ID of the currently active cell.")
               return;
@@ -138,9 +164,13 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
               return;
             }
 
-            const cellId : string = notebookTracker.currentWidget.content.activeCell.model.id;
+            const cellId = getCellIdFromEditor(view);
+            if (!cellId){ return; }
+
             const notebookId : string = notebookTracker.currentWidget.context.path
-            snippetsManager.create(currentView!, startLine + 1, endLine - 1, templateID, droppedText, notebookId, cellId);
+            snippetsManager.update(cellId,currentView!);
+            snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
+            snippetsManager.assignDecorations(currentView!, cellId);
 
             // move cursor to end of inserted text, so that there is no selection
             const cursorPos = dropPos + droppedText.length;
@@ -193,10 +223,14 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
         this.view = update.view;
         // Update the current view reference
         currentView = update.view;
+          //How does it know which view to add the decorations to
+          //its that view with that cell id thats why 
+        const cellId = getCellIdFromEditor(update.view);
 
+        if (!cellId){ return; }
         if (update.docChanged || update.transactions.length > 0) {
-          snippetsManager.update(update.view, update);
-          this.decorations = snippetsManager.assignDecorations(update.view);
+          snippetsManager.update(cellId, update.view, update);
+          this.decorations = snippetsManager.assignDecorations(update.view, cellId);
         }
       }
     },
