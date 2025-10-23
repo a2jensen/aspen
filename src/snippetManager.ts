@@ -259,10 +259,6 @@ export class SnippetsManager {
     // TODO: Implementation needed
   }
 
-//i need the editor view here :o , maybe pass the view here
-//would it be reduant to have a hashmap of cellid and view if i get the view to get the cell id in order to call the function?
-//Issue when i move up or down the cell the view does not allow it to push to all instances
-//so issue is the editor view perchance but i need the view in order to edit it\
 
   // Arrow functions automatically bind this to the instance where they were defined.
   editAll = ( templateId : string , templateContent : string ) => {

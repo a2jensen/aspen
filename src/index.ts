@@ -103,37 +103,37 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   /**
    * Adding command that allows their highlighted code to be saved as a template.
    */
-commands.addCommand("templates:create", {
-  label: "Save Code Snippet",
-  execute: async () => {
-    try {
-      const snippet = window.getSelection()?.toString().trim() || "";
-      if (!snippet) {
-        console.warn("No code snippet selected.");
-        return;
+  commands.addCommand("templates:create", {
+    label: "Save Code Snippet",
+    execute: async () => {
+      try {
+        const snippet = window.getSelection()?.toString().trim() || "";
+        if (!snippet) {
+          console.warn("No code snippet selected.");
+          return;
+        }
+
+        const template = await libraryWidget.createTemplate(snippet);
+        if (!template) {
+          console.error("Failed to create template.");
+          return;
+        }
+
+        document.dispatchEvent(
+          new CustomEvent("Save Code Snippet", {
+            detail: {
+              snippetText: snippet,
+              templateID: template.id
+            }
+          })
+        );
+
+        console.log("Snippet saved successfully:", template.id);
+      } catch (error: unknown) {
+        console.error("Template creation failed:", error);
       }
-
-      const template = await libraryWidget.createTemplate(snippet);
-      if (!template) {
-        console.error("Failed to create template.");
-        return;
-      }
-
-      document.dispatchEvent(
-        new CustomEvent("Save Code Snippet", {
-          detail: {
-            snippetText: snippet,
-            templateID: template.id
-          }
-        })
-      );
-
-      console.log("Snippet saved successfully:", template.id);
-    } catch (error: unknown) {
-      console.error("Template creation failed:", error);
     }
-  }
-});
+  });
 
   commands.addCommand("templates:push", {
     label: "Push Changes To Template",
@@ -219,17 +219,7 @@ commands.addCommand("templates:create", {
     selector: ".jp-FileEditor",
     rank : 1
   });
-  app.contextMenu.addItem({
-    command: "templates:create",
-    selector: ".jp-Notebook",
-    rank: 1
-  });
 
-  app.contextMenu.addItem({
-    command: "templates:push",
-    selector: ".jp-FileEditor",
-    rank : 1
-  });
   app.contextMenu.addItem({
     command: "templates:push",
     selector: ".jp-Notebook",

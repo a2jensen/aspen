@@ -223,8 +223,7 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
         this.view = update.view;
         // Update the current view reference
         currentView = update.view;
-          //How does it know which view to add the decorations to
-          //its that view with that cell id thats why 
+ 
         const cellId = getCellIdFromEditor(update.view);
 
         if (!cellId){ return; }
