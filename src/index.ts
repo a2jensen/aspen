@@ -216,7 +216,7 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   /** Adding the templates:create command to their respective context menus */
   app.contextMenu.addItem({
     command: "templates:create",
-    selector: ".jp-FileEditor",
+    selector: ".jp-Notebook",
     rank : 1
   });
 
