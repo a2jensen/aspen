@@ -2,37 +2,55 @@
 /* eslint-disable prettier/prettier */
 import { TemplatesManager } from "./TemplatesManager";
 import { SnippetsManager } from "./snippetManager";
-import { LibraryWidget } from "./LibraryWidget";
+import { LibraryWidget, FormattedContent } from "./LibraryWidget";
 
 export class Synchronization {
     private templatesManager : TemplatesManager
     private snippetsManager : SnippetsManager
     private libraryWidget : LibraryWidget
+    private syncFlag : boolean
 
-    constructor ( templatesManagerInstance : TemplatesManager, snippetsManagerInstance : SnippetsManager, libraryWidgetInstance : LibraryWidget){
+    constructor (templatesManagerInstance : TemplatesManager, snippetsManagerInstance : SnippetsManager, libraryWidgetInstance : LibraryWidget){
         this.templatesManager = templatesManagerInstance;
         this.snippetsManager = snippetsManagerInstance;
-        this.libraryWidget = libraryWidgetInstance
+        this.libraryWidget = libraryWidgetInstance;
+        this.syncFlag = false;
     }
-
-    /**
-     * Function that is called everytime an edit to a snippet instance is made.  called within the code mirror plugin.
-     * NOTE. I NEED TO GET JSDIFF INSTALLED CORRECTLY BEFORE WORKING ON THIS
-     */
-    jsDiff(){
-        return 0;
-    }
-    
 
     /**
      * 2 cases to consider: user makes changes to template and synchs, user makes changes to instance and synchs
      * when we push from the template, we set cases to false since template already is edited
      */
-    synch( templateId : string, content : string, pushFromInstance : boolean){
-        if (pushFromInstance){
-            this.templatesManager.edit(templateId, content)
+    sync( templateId : string, content : string, pushFromInstance : boolean ) : void {
+        this.syncFlag = true;
+        try {
+            if (pushFromInstance){
+                this.templatesManager.edit(templateId, content)
+            }
+            // detect if a textbox was edited, 
+            //this.snippetsManager.editAll(templateId, content, false)
+            this.libraryWidget.update()
+        } catch ( error : unknown ){
+            console.error("Error trying to sync: ", error)
+            return
+        } finally {
+            this.syncFlag = false;
         }
-        this.snippetsManager.editAll(templateId, content)
-        this.libraryWidget.update()
+    }
+
+    // temporary? function to handle global edits case
+    syncSnippets(templateId : string, content : FormattedContent[]) : void {
+        this.syncFlag = true;
+        try {
+            this.snippetsManager.editAll(templateId, content, true)
+        } catch ( error : unknown ){
+            console.error("Error trying to sync", error)
+        } finally {
+            this.syncFlag = false;
+        }
+    }
+
+    syncAction() : boolean {
+        return this.syncFlag;
     }
 }

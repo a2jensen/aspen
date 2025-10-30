@@ -14,6 +14,7 @@ import {TemplatesManager} from "./TemplatesManager";
 import {ContentsManager} from "@jupyterlab/services";
 import {LibraryWidget} from "./LibraryWidget";
 import {SnippetsManager} from "./snippetManager";
+import { TextboxesManager } from './TextboxesManager';
 import {Synchronization} from "./Synchronization";
 import {CodeMirrorExtension} from "./CodeMirrorPlugin";
 import {IEditorExtensionRegistry} from "@jupyterlab/codemirror"; // Interface for registering CodeMirror Extensions
@@ -43,8 +44,12 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   const contentsManager = new ContentsManager();
   const templatesManager = new TemplatesManager(contentsManager);
   const snippetsManager = new SnippetsManager(contentsManager, templatesManager);
-  const libraryWidget = new LibraryWidget(templatesManager, snippetsManager);
+  const textboxesManager = new TextboxesManager(templatesManager, snippetsManager,);
+  const libraryWidget = new LibraryWidget(templatesManager, snippetsManager, textboxesManager);
   const synchronization = new Synchronization(templatesManager, snippetsManager, libraryWidget);
+  libraryWidget.setSynchronization(synchronization);
+  textboxesManager.setLibraryWidget(libraryWidget) // setting widget
+
   libraryWidget.id = "jupyterlab-librarywidget-sidebarRight";
   libraryWidget.title.iconClass = "jp-SideBar-tabIcon"; 
   libraryWidget.title.caption = "Library display of templates";
@@ -96,7 +101,14 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
         templateID: dragInfo.getAttribute("data-template-id"),
         content: dragInfo.innerText
       }
+
+      const content = templatesManager.getContent(templateData.templateID!);
+      templateData.content = content;
+     
+      // console.log("Data that will be set onto the dataTransfer", templateData);
       event.dataTransfer?.setData("application/json", JSON.stringify(templateData));
+      event.dataTransfer?.setData("text/plain", templateData.content);
+
     }
   })
 
@@ -172,7 +184,8 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
 
         if (templateId) {
           // temporary fix, do something like LibraryWidget.synch. similar to create above
-          synchronization.synch(templateId, innerText, true);
+          // TODO: handle the textbox edit case here!
+          synchronization.sync(templateId, innerText, true);
         }
       }
       
@@ -243,8 +256,8 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   extensions.addExtension({
     name: "@aspen/codemirror_plugin",
     factory: () => ({
-      extension: CodeMirrorExtension(snippetsManager, notebookTracker),
-      instance: () => CodeMirrorExtension(snippetsManager, notebookTracker),
+      extension: CodeMirrorExtension(synchronization, snippetsManager, textboxesManager, notebookTracker),
+      instance: () => CodeMirrorExtension(synchronization, snippetsManager, textboxesManager, notebookTracker),
       reconfigure: () => null
     })
   });

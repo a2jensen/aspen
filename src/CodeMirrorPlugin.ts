@@ -1,7 +1,7 @@
 /* eslint-disable curly */
 /* eslint-disable @typescript-eslint/quotes */
 /* eslint-disable prettier/prettier */
-import { Extension } from '@codemirror/state';
+import { Extension, StateEffect } from '@codemirror/state';
 import {
   DecorationSet,
   EditorView,
@@ -9,10 +9,13 @@ import {
   ViewUpdate,
   keymap
 } from '@codemirror/view';
-import { SnippetsManager } from './snippetManager';
+import { SnippetsManager, textboxStateField } from './snippetManager';
+import { TextboxesManager } from './TextboxesManager';
+import { ISnippet } from './types';
 import { defaultKeymap} from '@codemirror/commands';
 import { customKeymap } from './customkeyBinds';
 import { INotebookTracker } from "@jupyterlab/notebook"
+import { Synchronization } from './Synchronization';
 
 // Create a global flag to track if the event listener has been registered
 let saveSnippetListenerRegistered = false;
@@ -40,7 +43,7 @@ let currentView: EditorView | null = null;
  * @param snippetsManager 
  * @returns ViewPluginExtension. Create a plugin for a class whose constructor takes a single editor view as argument.
  */
-export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTracker : INotebookTracker): Extension {
+export function CodeMirrorExtension(synchronization : Synchronization, snippetsManager: SnippetsManager, textboxesManager: TextboxesManager, notebookTracker : INotebookTracker): Extension {
   if(!saveSnippetListenerRegistered){
     saveSnippetListenerRegistered = true;
 
@@ -126,20 +129,21 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
         
         // Initialize decorations
         this.decorations = snippetsManager.assignDecorations(view);
+
+        // Dispatch textbox decorations
+        setTimeout(() => {
+          view.dispatch({
+            effects: StateEffect.appendConfig.of([textboxStateField]),
+            scrollIntoView: false
+          });
+        }, 0);
         
-        /**
-         * Event listener for drop events
-         * 
-         * Handles when a template is dragged and dropped into the editor.
-         * Parses the drop data and creates a new snippet instance if it contains
-         * a valid template.
-         */
         view.dom.addEventListener('drop', event => {
           event.preventDefault();
          
           const dragContent = event.dataTransfer?.getData('application/json');
           const droppedText = event.dataTransfer?.getData('text/plain');
-  
+
           if (!dragContent) return;
           if (!droppedText) return;
           
@@ -152,7 +156,6 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
           const startLine = view.state.doc.lineAt(dropPos).number;
           const endLine = startLine + droppedText.split('\n').length - 1;
           const templateID = parsedText.templateID;
-          
 
           setTimeout(() => {
             if (!notebookTracker?.currentWidget?.context?.path){
@@ -168,6 +171,8 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
             if (!cellId){ return; }
 
             const notebookId : string = notebookTracker.currentWidget.context.path
+            const snippet = snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
+            textboxesManager.dropTextboxes(snippet);
             snippetsManager.update(cellId,currentView!);
             snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
             snippetsManager.assignDecorations(currentView!, cellId);
@@ -208,7 +213,7 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
           currentView = null;
         }
       }
-
+      
       /**
        * Updates the plugin state when changes occur in the editor
        * 
@@ -223,13 +228,37 @@ export function CodeMirrorExtension(snippetsManager: SnippetsManager, notebookTr
         this.view = update.view;
         // Update the current view reference
         currentView = update.view;
- 
         const cellId = getCellIdFromEditor(update.view);
-
         if (!cellId){ return; }
+
+        const cursorPos = update.state.selection.main.head;
+        const cursorLine = update.state.doc.lineAt(cursorPos).number;
+        const editedSnippets : ISnippet[] = snippetsManager.snippetTracker.filter(s => s.cell_id === cellId);
+
         if (update.docChanged || update.transactions.length > 0) {
+          // update snippets
           snippetsManager.update(cellId, update.view, update);
           this.decorations = snippetsManager.assignDecorations(update.view, cellId);
+          
+          if (synchronization.syncAction()) {
+            console.log("Detected a sync action! returning early and not running diff checks ")
+            return;
+          }
+          
+          // console.log("MADE IT PAST THE RETURN")
+          update.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+            for(const snippet of editedSnippets){
+              textboxesManager.updateTextboxes(snippet, update, this.view);
+              const isWhiteSpace = inserted.length > 0 && /^[ \t\r\n]*$/.test(inserted.toString());
+              if(cursorLine >= snippet.start_line && cursorLine <= snippet.end_line && (!isWhiteSpace)) {
+                let charsInserted = inserted.toString().length
+                if(charsInserted === 0){
+                  charsInserted = fromA - toA;
+                }
+                textboxesManager.diffCheck(snippet, charsInserted);
+              }
+            }
+          });
         }
       }
     },
