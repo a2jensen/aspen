@@ -313,7 +313,7 @@ export class SnippetsManager {
         console.log(`Failed to find snippet with ID ${templateId}.`)
         return
       }
-      const correspondingTemplateContent = templateContent.find(template => template.snippetId == snippet.id)
+      const correspondingTemplateContent = templateContent.find(template => template.snippetId === snippet.id)
       if (!correspondingTemplateContent){
         console.log("Could not find the needed template content - in editAll")
         return;

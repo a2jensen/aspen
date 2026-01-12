@@ -174,7 +174,6 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
             const snippet = snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
             textboxesManager.dropTextboxes(snippet);
             snippetsManager.update(cellId,currentView!);
-            snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
             snippetsManager.assignDecorations(currentView!, cellId);
 
             // move cursor to end of inserted text, so that there is no selection
