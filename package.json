@@ -51,6 +51,11 @@
         "stylelint": "jlpm stylelint:check --fix",
         "stylelint:check": "stylelint --cache \"style/**/*.css\"",
         "test": "jest --coverage",
+        "test:watch": "jest --watch",
+        "test:unit": "jest --no-coverage",
+        "test:file": "jest --no-coverage",
+        "test:verbose": "jest --no-coverage --verbose",
+        "test:debug": "VERBOSE_TESTS=true jest --no-coverage --verbose",
         "watch": "run-p watch:src watch:labextension",
         "watch:src": "tsc -w --sourceMap",
         "watch:labextension": "jupyter labextension watch ."

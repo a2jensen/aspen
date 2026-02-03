@@ -60,6 +60,44 @@ export interface ITextbox{
   sharedId: number 
 }
 
+/**
+ * Represents a single diff region between template and snippet content.
+ * Used by the highlight system to track where divergence exists.
+ *
+ * @type line - 0-indexed line number (relative to snippet/template start)
+ * @type templateFrom - char offset where diff starts in template line
+ * @type templateTo - char offset where diff ends in template line
+ * @type templateContent - the text in the template at this range (empty if insertion)
+ * @type snippetFrom - char offset where diff starts in snippet line
+ * @type snippetTo - char offset where diff ends in snippet line
+ * @type snippetContent - the text in the snippet at this range (empty if deletion)
+ */
+export interface DiffRegion {
+  line: number;
+  templateFrom: number;
+  templateTo: number;
+  templateContent: string;
+  snippetFrom: number;
+  snippetTo: number;
+  snippetContent: string;
+}
+
+/**
+ * Represents a {{}} placeholder position in template content.
+ * Used for parsing and updating template markers.
+ *
+ * @type line - 0-indexed line number
+ * @type from - char offset of {{ in the line
+ * @type to - char offset after }} in the line
+ * @type content - the inner content between {{ and }}
+ */
+export interface PlaceholderPosition {
+  line: number;
+  from: number;
+  to: number;
+  content: string;
+}
+
 // exposing the only needed methods from the ContentsManager API.
 export interface IContentsManager {
   save(path: string, options?: (Partial<Contents.IModel> & Partial<Contents.IContentProvisionOptions>)) : Promise<Contents.IModel>

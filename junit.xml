@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="31" failures="0" errors="0" time="1.657">
+  <testsuite name="stripPlaceholders" errors="0" failures="0" skipped="0" timestamp="2026-02-03T07:03:19" time="1.068" tests="31">
+    <testcase classname="stripPlaceholders stripPlaceholders(&quot;{{data.csv}}&quot;) → &quot;data.csv&quot;" name="stripPlaceholders stripPlaceholders(&quot;{{data.csv}}&quot;) → &quot;data.csv&quot;" time="0.002">
+    </testcase>
+    <testcase classname="stripPlaceholders stripPlaceholders(&quot;df = pd.read_csv(\&quot;{{data.csv}}\&quot;)&quot;) → &quot;df = pd.read_csv(\&quot;data.csv\&quot;)&quot;" name="stripPlaceholders stripPlaceholders(&quot;df = pd.read_csv(\&quot;{{data.csv}}\&quot;)&quot;) → &quot;df = pd.read_csv(\&quot;data.csv\&quot;)&quot;" time="0">
+    </testcase>
+    <testcase classname="stripPlaceholders stripPlaceholders(&quot;hello {{world}} foo {{bar}}&quot;) → &quot;hello world foo bar&quot;" name="stripPlaceholders stripPlaceholders(&quot;hello {{world}} foo {{bar}}&quot;) → &quot;hello world foo bar&quot;" time="0">
+    </testcase>
+    <testcase classname="stripPlaceholders stripPlaceholders(&quot;{{}}&quot;) → &quot;&quot;" name="stripPlaceholders stripPlaceholders(&quot;{{}}&quot;) → &quot;&quot;" time="0">
+    </testcase>
+    <testcase classname="stripPlaceholders stripPlaceholders(&quot;no placeholders here&quot;) → &quot;no placeholders here&quot;" name="stripPlaceholders stripPlaceholders(&quot;no placeholders here&quot;) → &quot;no placeholders here&quot;" time="0">
+    </testcase>
+    <testcase classname="stripPlaceholders stripPlaceholders(&quot;line1 {{a}}\nline2 {{b}}&quot;) → &quot;line1 a\nline2 b&quot;" name="stripPlaceholders stripPlaceholders(&quot;line1 {{a}}\nline2 {{b}}&quot;) → &quot;line1 a\nline2 b&quot;" time="0">
+    </testcase>
+    <testcase classname="parsePlaceholders parses single placeholder: &quot;{{data.csv}}&quot;" name="parsePlaceholders parses single placeholder: &quot;{{data.csv}}&quot;" time="0.001">
+    </testcase>
+    <testcase classname="parsePlaceholders parses placeholder in context: &quot;prefix {{value}} suffix&quot;" name="parsePlaceholders parses placeholder in context: &quot;prefix {{value}} suffix&quot;" time="0">
+    </testcase>
+    <testcase classname="parsePlaceholders parses multiple placeholders: &quot;{{a}} and {{b}}&quot;" name="parsePlaceholders parses multiple placeholders: &quot;{{a}} and {{b}}&quot;" time="0">
+    </testcase>
+    <testcase classname="parsePlaceholders parses multiline: &quot;line0 {{a}}\nline1 {{b}}&quot;" name="parsePlaceholders parses multiline: &quot;line0 {{a}}\nline1 {{b}}&quot;" time="0">
+    </testcase>
+    <testcase classname="parsePlaceholders parses empty placeholder: &quot;{{}}&quot;" name="parsePlaceholders parses empty placeholder: &quot;{{}}&quot;" time="0">
+    </testcase>
+    <testcase classname="parsePlaceholders returns empty for no placeholders: &quot;no placeholders&quot;" name="parsePlaceholders returns empty for no placeholders: &quot;no placeholders&quot;" time="0">
+    </testcase>
+    <testcase classname="computeDiffs identical content returns empty array" name="computeDiffs identical content returns empty array" time="0.001">
+    </testcase>
+    <testcase classname="computeDiffs different line counts returns null" name="computeDiffs different line counts returns null" time="0">
+    </testcase>
+    <testcase classname="computeDiffs simple word replacement" name="computeDiffs simple word replacement" time="0.001">
+    </testcase>
+    <testcase classname="computeDiffs deletion" name="computeDiffs deletion" time="0.001">
+    </testcase>
+    <testcase classname="computeDiffs multiple diffs on same line" name="computeDiffs multiple diffs on same line" time="0">
+    </testcase>
+    <testcase classname="computeDiffs diffs on multiple lines" name="computeDiffs diffs on multiple lines" time="0.001">
+    </testcase>
+    <testcase classname="computeDiffs adjacent diffs merge" name="computeDiffs adjacent diffs merge" time="0">
+    </testcase>
+    <testcase classname="computeDiffs detects insertion at end" name="computeDiffs detects insertion at end" time="0">
+    </testcase>
+    <testcase classname="computeDiffs handles quoted strings" name="computeDiffs handles quoted strings" time="0.001">
+    </testcase>
+    <testcase classname="updateTemplatePlaceholders word replacement → wraps in {{}}" name="updateTemplatePlaceholders word replacement → wraps in {{}}" time="0">
+    </testcase>
+    <testcase classname="updateTemplatePlaceholders simple replacement → wraps in {{}}" name="updateTemplatePlaceholders simple replacement → wraps in {{}}" time="0">
+    </testcase>
+    <testcase classname="updateTemplatePlaceholders deletion → wraps deleted content in {{}}" name="updateTemplatePlaceholders deletion → wraps deleted content in {{}}" time="0.001">
+    </testcase>
+    <testcase classname="updateTemplatePlaceholders no diff → strips existing {{}}" name="updateTemplatePlaceholders no diff → strips existing {{}}" time="0">
+    </testcase>
+    <testcase classname="updateTemplatePlaceholders insertion → adds empty {{}} at position" name="updateTemplatePlaceholders insertion → adds empty {{}} at position" time="0">
+    </testcase>
+    <testcase classname="updateTemplatePlaceholders handles multiple diffs on same line" name="updateTemplatePlaceholders handles multiple diffs on same line" time="0">
+    </testcase>
+    <testcase classname="updateTemplatePlaceholders handles multiline content" name="updateTemplatePlaceholders handles multiline content" time="0">
+    </testcase>
+    <testcase classname="computeDiffsFromTemplate strips placeholders before comparing (no diff)" name="computeDiffsFromTemplate strips placeholders before comparing (no diff)" time="0">
+    </testcase>
+    <testcase classname="computeDiffsFromTemplate detects diff with placeholder in template" name="computeDiffsFromTemplate detects diff with placeholder in template" time="0">
+    </testcase>
+    <testcase classname="computeDiffsFromTemplate returns null for line count mismatch" name="computeDiffsFromTemplate returns null for line count mismatch" time="0.001">
+    </testcase>
+  </testsuite>
+</testsuites>
