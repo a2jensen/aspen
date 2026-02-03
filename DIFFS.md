@@ -238,3 +238,392 @@ The template doesn't try to show all variants — it just marks the region as va
 | Line count change | — | — | Auto-unsync |
 | Revert to match | Remove highlight | Remove highlight | Back in sync |
 | Adjacent diffs | Merge | Merge | Single highlight |
+
+---
+
+# TESTING
+
+## CLI Diff Testing Tool
+
+A standalone CLI tool for testing the diff/highlight system in-memory without running Jest. It reads test cases from JSON files and outputs visual representations of where highlights would appear.
+
+---
+
+### Quick Start
+
+```bash
+# Run a single test file
+npm run diff:test -- test-cases/replacement.json
+
+# Run all test files in a directory
+npm run diff:test -- test-cases/
+
+# Show help
+npm run diff:test -- --help
+```
+
+---
+
+### Test Case Format
+
+#### Single Test Case
+
+```json
+{
+  "name": "Replacement - filename change",
+  "template": "df = pd.read_csv(\"data.csv\")",
+  "instances": [
+    "df = pd.read_csv(\"sales.csv\")",
+    "df = pd.read_csv(\"orders.csv\")"
+  ]
+}
+```
+
+#### Batch Mode (Multiple Test Cases)
+
+```json
+{
+  "testCases": [
+    {
+      "name": "Simple replacement",
+      "template": "name = \"Alice\"",
+      "instances": ["name = \"Bob\"", "name = \"Charlie\""]
+    },
+    {
+      "name": "Function argument change",
+      "template": "calculate(100)",
+      "instances": ["calculate(200)", "calculate(50)"]
+    }
+  ]
+}
+```
+
+#### Multiline Content
+
+Use `\n` for newlines in JSON strings:
+
+```json
+{
+  "name": "Multiline template",
+  "template": "x = 1\ny = 2",
+  "instances": ["x = 1\ny = 3"]
+}
+```
+
+---
+
+### Output Format
+
+The CLI displays:
+
+1. **Highlighted content** - Template (red) and instance (green) with diff regions highlighted
+2. **Caret markers** (`^`) - Show exact character positions of differences
+3. **Position annotations** - `[from-to] "content"` for each diff region
+4. **DiffRegions data** - Structured view of the `DiffRegion[]` array
+5. **Status** - Synced (✓), Diverged (△), or Unsynced (✗)
+
+Example output:
+
+```
+╭──────────────────────────────────────────────────╮
+│         Replacement - filename change            │
+╰──────────────────────────────────────────────────╯
+
+  Template: df = pd.read_csv("data.csv")
+                              ^^^^
+                              [18-22] "data"
+
+  Instance 1: df = pd.read_csv("sales.csv")
+                                ^^^^^
+                                [18-23] "sales"
+
+  DiffRegions:
+  ┌──────────────────────────────────────────────────┐
+  │ line: 0                                          │
+  │ template: [18, 22] "data"                        │
+  │ snippet:  [18, 23] "sales"                       │
+  └──────────────────────────────────────────────────┘
+
+  Status: △ 1 diff region found
+```
+
+---
+
+### Instance Statuses
+
+| Status | Symbol | Meaning |
+|--------|--------|---------|
+| Synced | ✓ | Instance matches template exactly (no diffs) |
+| Diverged | △ | Instance has differences from template |
+| Unsynced | ✗ | Line count mismatch — cannot diff |
+
+---
+
+### Available Test Cases
+
+Pre-built test cases in `test-cases/`:
+
+| File | Description |
+|------|-------------|
+| `replacement.json` | Text replaced (e.g., filename change) |
+| `insertion.json` | Text added in instance |
+| `deletion.json` | Text removed from instance |
+| `multiple-edits.json` | Multiple changes on same line |
+| `line-mismatch.json` | Line count differs (auto-unsync) |
+| `identical.json` | No differences (fully synced) |
+| `batch-example.json` | Multiple test cases in one file |
+
+---
+
+### Creating New Test Cases
+
+1. Create a new `.json` file in `test-cases/` (or any directory)
+2. Define the test case with `name`, `template`, and `instances`
+3. Run with `npm run diff:test -- path/to/your-test.json`
+
+Example for testing a deletion:
+
+```json
+{
+  "name": "Remove optional parameter",
+  "template": "fetch(url, { cache: 'no-store' })",
+  "instances": [
+    "fetch(url, {})",
+    "fetch(url)"
+  ]
+}
+```
+
+---
+
+### File Structure
+
+```
+src/cli/
+├── diffTester.ts       # Main CLI entry point
+├── formatOutput.ts     # Terminal output formatting with ANSI colors
+└── types.ts            # CLI-specific types (ITestCase, ITestResult, etc.)
+
+test-cases/
+├── replacement.json
+├── insertion.json
+├── deletion.json
+├── multiple-edits.json
+├── line-mismatch.json
+├── identical.json
+└── batch-example.json
+```
+
+---
+
+### How It Works
+
+1. Loads JSON test file(s)
+2. For each test case, runs `computeDiffs(template, instance)` from `diffEngine.ts`
+3. Formats results with ANSI colors for terminal display
+4. Shows summary of all test results
+
+The CLI reuses the same `computeDiffs` function used in the actual extension, ensuring test results match real behavior.
+
+---
+
+## Data Structures
+
+These are the core data structures used to represent diff regions. The CLI outputs these directly so you can see exactly what data will be used to apply highlights in CodeMirror.
+
+### DiffRegion
+
+The primary structure returned by `computeDiffs()`. Each `DiffRegion` represents one contiguous area of difference between template and instance.
+
+```typescript
+interface DiffRegion {
+  line: number;           // 0-indexed line number
+  templateFrom: number;   // char offset where diff starts in template
+  templateTo: number;     // char offset where diff ends in template
+  templateContent: string; // text in template at this range (empty if insertion)
+  snippetFrom: number;    // char offset where diff starts in instance
+  snippetTo: number;      // char offset where diff ends in instance
+  snippetContent: string; // text in instance at this range (empty if deletion)
+}
+```
+
+### Example: Replacement
+
+```
+Template: df = pd.read_csv("data.csv")
+Instance: df = pd.read_csv("sales.csv")
+                           ^^^^  ^^^^^
+                           Position 18
+```
+
+**DiffRegion output:**
+```json
+{
+  "line": 0,
+  "templateFrom": 18,
+  "templateTo": 22,
+  "templateContent": "data",
+  "snippetFrom": 18,
+  "snippetTo": 23,
+  "snippetContent": "sales"
+}
+```
+
+**How to apply highlights:**
+- Template highlight: characters 18-22 on line 0
+- Instance highlight: characters 18-23 on line 0
+
+---
+
+### Example: Insertion (text added in instance)
+
+```
+Template: df = pd.read_csv("data.csv")
+Instance: df = pd.read_csv("data.csv")  # load
+                                       ^
+                                       Position 28 (end of template)
+```
+
+**DiffRegion output:**
+```json
+{
+  "line": 0,
+  "templateFrom": 28,
+  "templateTo": 28,
+  "templateContent": "",
+  "snippetFrom": 30,
+  "snippetTo": 36,
+  "snippetContent": "# load"
+}
+```
+
+**How to apply highlights:**
+- Template highlight: **none** (from === to, zero-width range)
+- Instance highlight: characters 30-36 on line 0
+
+---
+
+### Example: Deletion (text removed from instance)
+
+```
+Template: result = process(data, verbose=True)
+Instance: result = process(data)
+                              ^
+                              Position 21
+```
+
+**DiffRegion output:**
+```json
+{
+  "line": 0,
+  "templateFrom": 21,
+  "templateTo": 35,
+  "templateContent": ", verbose=True",
+  "snippetFrom": 21,
+  "snippetTo": 21,
+  "snippetContent": ""
+}
+```
+
+**How to apply highlights:**
+- Template highlight: characters 21-35 on line 0
+- Instance highlight: **none** (from === to, zero-width range)
+
+---
+
+### Example: Multiple Diffs on Same Line
+
+```
+Template: plt.plot(x, y, color="blue")
+Instance: plt.plot(a, b, color="red")
+```
+
+**DiffRegion[] output:**
+```json
+[
+  {
+    "line": 0,
+    "templateFrom": 9, "templateTo": 10, "templateContent": "x",
+    "snippetFrom": 9, "snippetTo": 10, "snippetContent": "a"
+  },
+  {
+    "line": 0,
+    "templateFrom": 12, "templateTo": 13, "templateContent": "y",
+    "snippetFrom": 12, "snippetTo": 13, "snippetContent": "b"
+  },
+  {
+    "line": 0,
+    "templateFrom": 22, "templateTo": 26, "templateContent": "blue",
+    "snippetFrom": 22, "snippetTo": 25, "snippetContent": "red"
+  }
+]
+```
+
+**How to apply highlights:**
+- Template: 3 separate highlights at [9-10], [12-13], [22-26]
+- Instance: 3 separate highlights at [9-10], [12-13], [22-25]
+
+---
+
+### Return Values from computeDiffs()
+
+| Return Value | Meaning | Action |
+|--------------|---------|--------|
+| `DiffRegion[]` (non-empty) | Differences found | Apply highlights at specified positions |
+| `[]` (empty array) | No differences | Content is identical, no highlights needed |
+| `null` | Line count mismatch | Auto-unsync the instance |
+
+---
+
+### PlaceholderPosition
+
+Used internally for parsing `{{}}` markers in templates. Not directly used for highlights but relevant for template editing.
+
+```typescript
+interface PlaceholderPosition {
+  line: number;    // 0-indexed line number
+  from: number;    // char offset of {{ in the line
+  to: number;      // char offset after }} in the line
+  content: string; // inner content between {{ and }}
+}
+```
+
+Example for template `df = pd.read_csv("{{data.csv}}")`:
+
+```json
+{
+  "line": 0,
+  "from": 18,
+  "to": 32,
+  "content": "data.csv"
+}
+```
+
+---
+
+### Applying Highlights in CodeMirror
+
+The `DiffRegion` data maps directly to CodeMirror decorations:
+
+```typescript
+// For each DiffRegion, create decoration ranges:
+
+// Template-side decoration (if templateContent is non-empty)
+if (region.templateTo > region.templateFrom) {
+  const from = lineStart + region.templateFrom;
+  const to = lineStart + region.templateTo;
+  // Add Decoration.mark({ class: "cm-template-highlight" }).range(from, to)
+}
+
+// Instance-side decoration (if snippetContent is non-empty)
+if (region.snippetTo > region.snippetFrom) {
+  const from = lineStart + region.snippetFrom;
+  const to = lineStart + region.snippetTo;
+  // Add Decoration.mark({ class: "cm-instance-highlight" }).range(from, to)
+}
+```
+
+Key points:
+- Use `line` to calculate the absolute position (add line's start offset)
+- Skip zero-width ranges (from === to) — no visual highlight needed
+- Template uses `templateFrom`/`templateTo`, instance uses `snippetFrom`/`snippetTo`

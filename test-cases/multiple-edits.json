@@ -1,0 +1,7 @@
+{
+  "name": "Multiple edits on same line",
+  "template": "plt.plot(x, y, color=\"blue\")",
+  "instances": [
+    "plt.plot(a, b, color=\"red\")"
+  ]
+}

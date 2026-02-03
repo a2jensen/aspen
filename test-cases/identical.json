@@ -1,0 +1,7 @@
+{
+  "name": "Identical content - no diffs",
+  "template": "print(\"Hello World\")",
+  "instances": [
+    "print(\"Hello World\")"
+  ]
+}

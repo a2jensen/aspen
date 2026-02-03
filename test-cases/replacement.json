@@ -1,0 +1,8 @@
+{
+  "name": "Replacement - filename change",
+  "template": "df = pd.read_csv(\"data.csv\")",
+  "instances": [
+    "df = pd.read_csv(\"sales.csv\")",
+    "df = pd.read_csv(\"orders.csv\")"
+  ]
+}

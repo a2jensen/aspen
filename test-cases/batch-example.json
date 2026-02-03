@@ -1,0 +1,20 @@
+{
+  "testCases": [
+    {
+      "name": "Simple replacement",
+      "template": "name = \"Alice\"",
+      "instances": [
+        "name = \"Bob\"",
+        "name = \"Charlie\""
+      ]
+    },
+    {
+      "name": "Function argument change",
+      "template": "calculate(100)",
+      "instances": [
+        "calculate(200)",
+        "calculate(50)"
+      ]
+    }
+  ]
+}

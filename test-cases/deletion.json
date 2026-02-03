@@ -1,0 +1,7 @@
+{
+  "name": "Deletion - text removed in instance",
+  "template": "result = process(data, verbose=True)",
+  "instances": [
+    "result = process(data)"
+  ]
+}

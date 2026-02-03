@@ -1,0 +1,7 @@
+{
+  "name": "Line count mismatch - auto-unsync",
+  "template": "x = 1\ny = 2",
+  "instances": [
+    "x = 1\nz = 0\ny = 2"
+  ]
+}

@@ -119,7 +119,24 @@ npm run test
 
 ## Next Steps
 
-When resuming, start with **Phase 3: CodeMirror Decoration Application**.
+When resuming the phase walkthrough, start with **Phase 3: CodeMirror Decoration Application**. BUT FOR NOW DO THIS:
+
+IMPLEMENTATION OF A CUSTOM CLI TOOL SEPARATE FROM THE JEST TESTS:
+What needs to be implemented next is CLI tool or some interaction with being able to test this diffing visual system in-memory through the terminal.
+
+This is the expected behavior:
+- I should be able to provide through a JSON file the template and its snippet instances
+- It should then output to the terminal a result of where highlights should be placed.
+
+Example:
+- Template: "Hello"
+- Instances: "Hello World"
+
+---> Result: 
+- Highlights -> Data Structure Display
+- Instances: "Hello World" say "World" is highlighted or something....
+
+FIRST WRITE OUT A PLAN FOR TESTING OUT THIS TOOL
 
 Reference documents:
 - `IMPLEMENTATION_PLAN.md` - Full 6-phase plan with details
