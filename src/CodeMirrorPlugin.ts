@@ -244,25 +244,14 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
             return;
           }
           
-          // console.log("MADE IT PAST THE RETURN")
-          update.changes.iterChanges((_fromA, _toA, _fromB, _toB, inserted) => {
-            for(const snippet of editedSnippets){
-              // OLD textbox system - disabled in favor of new diff-based highlights
-              // textboxesManager.updateTextboxes(snippet, update, this.view);
-              const isWhiteSpace = inserted.length > 0 && /^[ \t\r\n]*$/.test(inserted.toString());
-              if(cursorLine >= snippet.start_line && cursorLine <= snippet.end_line && (!isWhiteSpace)) {
-                // OLD textbox system - disabled
-                // let charsInserted = inserted.toString().length
-                // if(charsInserted === 0){
-                //   charsInserted = fromA - toA;
-                // }
-                // textboxesManager.diffCheck(snippet, charsInserted);
-
-                // NEW: Apply diff-based highlights
-                highlightsManager.onSnippetEdit(snippet);
-              }
+          // Check all edited snippets for diff-based highlights
+          for (const snippet of editedSnippets) {
+            // Call onSnippetEdit for any change within snippet bounds
+            // The diff engine will handle line count mismatches (unsync) and content diffs (highlights)
+            if (cursorLine >= snippet.start_line && cursorLine <= snippet.end_line) {
+              highlightsManager.onSnippetEdit(snippet);
             }
-          });
+          }
         }
       }
     },
