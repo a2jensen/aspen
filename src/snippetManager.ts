@@ -6,7 +6,7 @@
 import { RangeSetBuilder, StateEffect, Range, StateField, Annotation } from '@codemirror/state';
 import { ContentsManager } from "@jupyterlab/services";
 import { TemplatesManager } from './TemplatesManager';
-import { ISnippet, ITemplate, ITextbox } from "./types";
+import { DiffRegion, ISnippet, ITemplate, ITextbox } from './types';
 import { FormattedContent } from './LibraryWidget';
 import {
   Decoration,
@@ -51,6 +51,7 @@ export class SnippetsManager {
   public cellMap: Map<string,EditorView>; /** Map to associate editor views with their unique cell IDs */
   private templatesManager : TemplatesManager;
   private textboxMap: Map<number, Range<Decoration>>; /** Map to help track textbox decorations for updates */
+  private snippetDecorations: Map<string, DecorationSet>; /** Map of snippetId → decorations for diff highlights */
 
   /**
    * Initializes a new instance of the SnippetsManager
@@ -60,6 +61,7 @@ export class SnippetsManager {
     this.cellMap = new Map();
     this.templatesManager = templates;
     this.textboxMap = new Map<number, Range<Decoration>>();
+    this.snippetDecorations = new Map<string, DecorationSet>();
     
 
     //this.contentsManager = contentsManager;
@@ -580,5 +582,118 @@ export class SnippetsManager {
       }
     }
     return snippets;
+  }
+
+  // ============================================================
+  // Phase 3: New Diff-Based Highlight Methods
+  // ============================================================
+
+  /**
+   * Applies highlight decorations to a snippet based on diff regions.
+   * This is the new simplified approach that takes DiffRegion[] directly.
+   *
+   * @param snippet - The snippet to apply highlights to
+   * @param diffs - Array of DiffRegion from computeDiffs()
+   * @param color - The template color (hex) for highlighting
+   */
+  applyDiffHighlights(snippet: ISnippet, diffs: DiffRegion[], color: string): void {
+    const targetView = this.getView(snippet.cell_id);
+    if (!targetView) {
+      console.warn(`Editor view not found for snippet ${snippet.id}`);
+      return;
+    }
+
+    // Defer to next frame to avoid "dispatch during update" error
+    requestAnimationFrame(() => {
+      const doc = targetView.state.doc;
+      const builder = new RangeSetBuilder<Decoration>();
+      const bgColor = this.hexToRgba(color);
+
+      // Build decorations for each diff region where snippet has content
+      for (const region of diffs) {
+        // Skip zero-width ranges (deletions show nothing on snippet side)
+        if (region.snippetFrom === region.snippetTo) {
+          continue;
+        }
+
+        // Calculate absolute position in the document
+        const absoluteLine = snippet.start_line + region.line;
+
+        // Bounds check
+        if (absoluteLine < 1 || absoluteLine > doc.lines) {
+          console.warn(`Line ${absoluteLine} out of bounds for snippet ${snippet.id}`);
+          continue;
+        }
+
+        const lineInfo = doc.line(absoluteLine);
+        const from = lineInfo.from + region.snippetFrom;
+        const to = lineInfo.from + region.snippetTo;
+
+        // Clamp to line bounds
+        const clampedFrom = Math.max(lineInfo.from, Math.min(from, lineInfo.to));
+        const clampedTo = Math.max(clampedFrom, Math.min(to, lineInfo.to));
+
+        if (clampedFrom < clampedTo) {
+          builder.add(
+            clampedFrom,
+            clampedTo,
+            Decoration.mark({
+              attributes: {
+                style: `background-color: ${bgColor}`,
+                class: 'diff-highlight'
+              },
+              snippetId: snippet.id
+            })
+          );
+        }
+      }
+
+      const newDecorations = builder.finish();
+
+      // Store in our tracking map
+      this.snippetDecorations.set(snippet.id, newDecorations);
+
+      // Dispatch to the editor
+      targetView.dispatch({
+        effects: updateTextboxEffect.of(newDecorations)
+      });
+    });
+  }
+
+  /**
+   * Clears all diff highlight decorations for a specific snippet.
+   *
+   * @param snippetId - The ID of the snippet to clear highlights from
+   */
+  clearSnippetHighlights(snippetId: string): void {
+    const snippet = this.snippetTracker.find(s => s.id === snippetId);
+    if (!snippet) {
+      return;
+    }
+
+    const targetView = this.getView(snippet.cell_id);
+    if (!targetView) {
+      return;
+    }
+
+    // Remove from tracking
+    this.snippetDecorations.delete(snippetId);
+
+    // Defer to next frame to avoid "dispatch during update" error
+    requestAnimationFrame(() => {
+      targetView.dispatch({
+        effects: updateTextboxEffect.of(Decoration.none)
+      });
+    });
+  }
+
+  /**
+   * Gets the current diff decorations for a snippet.
+   *
+   * @param snippetId - The ID of the snippet
+   * @returns The DecorationSet or undefined if none exist
+   */
+  getSnippetDecorations(snippetId: string): DecorationSet | undefined {
+    return this.snippetDecorations.get(snippetId);
   }
 }

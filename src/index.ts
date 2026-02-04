@@ -15,6 +15,7 @@ import {ContentsManager} from "@jupyterlab/services";
 import {LibraryWidget} from "./LibraryWidget";
 import {SnippetsManager} from "./snippetManager";
 import { TextboxesManager } from './TextboxesManager';
+import { HighlightsManager } from './HighlightsManager';
 import {Synchronization} from "./Synchronization";
 import {CodeMirrorExtension} from "./CodeMirrorPlugin";
 import {IEditorExtensionRegistry} from "@jupyterlab/codemirror"; // Interface for registering CodeMirror Extensions
@@ -45,6 +46,7 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   const templatesManager = new TemplatesManager(contentsManager);
   const snippetsManager = new SnippetsManager(contentsManager, templatesManager);
   const textboxesManager = new TextboxesManager(templatesManager, snippetsManager,);
+  const highlightsManager = new HighlightsManager(templatesManager, snippetsManager);
   const libraryWidget = new LibraryWidget(templatesManager, snippetsManager, textboxesManager);
   const synchronization = new Synchronization(templatesManager, snippetsManager, libraryWidget);
   libraryWidget.setSynchronization(synchronization);
@@ -256,8 +258,8 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   extensions.addExtension({
     name: "@aspen/codemirror_plugin",
     factory: () => ({
-      extension: CodeMirrorExtension(synchronization, snippetsManager, textboxesManager, notebookTracker),
-      instance: () => CodeMirrorExtension(synchronization, snippetsManager, textboxesManager, notebookTracker),
+      extension: CodeMirrorExtension(synchronization, snippetsManager, textboxesManager, highlightsManager, notebookTracker),
+      instance: () => CodeMirrorExtension(synchronization, snippetsManager, textboxesManager, highlightsManager, notebookTracker),
       reconfigure: () => null
     })
   });

@@ -286,6 +286,54 @@ Replace calls to `textboxesManager.diffCheck()` and `textboxesManager.updateText
 
 ---
 
+### Manual Testing Instructions
+
+**Build and Run:**
+```bash
+jlpm build && jupyter lab
+```
+
+**Test Case 1: Basic Replacement Highlight**
+1. Create a template with content: `df = pd.read_csv("data.csv")`
+2. Drag the template into a notebook cell to create a snippet instance
+3. Edit the snippet: change `"data.csv"` to `"sales.csv"`
+4. **Expected:**
+   - Console shows: `Applied 1 highlight(s) to snippet...`
+   - `"sales.csv"` appears with a colored background highlight
+
+**Test Case 2: Insertion Highlight**
+1. Create a template: `print("hello")`
+2. Drag to create snippet
+3. Edit snippet to: `print("hello")  # comment`
+4. **Expected:** `# comment` is highlighted (insertion)
+
+**Test Case 3: Multiple Edits**
+1. Create a template: `plt.plot(x, y, color="blue")`
+2. Drag to create snippet
+3. Edit snippet to: `plt.plot(a, b, color="red")`
+4. **Expected:** Three separate highlights on `a`, `b`, and `red`
+
+**Test Case 4: No Highlight When Matching**
+1. Create a template and drag to create snippet
+2. Make an edit, see highlight appear
+3. Undo the edit (Ctrl+Z) or manually revert
+4. **Expected:** Highlight disappears, console shows highlights cleared
+
+**Test Case 5: Auto-Unsync on Line Count Change**
+1. Create a template: `x = 1`
+2. Drag to create snippet
+3. Add a new line: `x = 1\ny = 2`
+4. **Expected:**
+   - Console shows: `Line count mismatch for snippet... - auto-unsyncing`
+   - Snippet border decorations disappear (no longer linked)
+
+**Debugging Tips:**
+- Check browser console for `Applied X highlight(s)` messages
+- Use CLI tool to verify expected DiffRegion output: `npm run diff:test -- test-cases/replacement.json`
+- Both old (textbox) and new (diff-based) systems run in parallel until Phase 5 cleanup
+
+---
+
 ## Phase 5: Cleanup
 
 **Goal:** Remove old code.

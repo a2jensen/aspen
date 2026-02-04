@@ -11,6 +11,7 @@ import {
 } from '@codemirror/view';
 import { SnippetsManager, textboxStateField } from './snippetManager';
 import { TextboxesManager } from './TextboxesManager';
+import { HighlightsManager } from './HighlightsManager';
 import { ISnippet } from './types';
 import { defaultKeymap} from '@codemirror/commands';
 import { customKeymap } from './customkeyBinds';
@@ -43,7 +44,7 @@ let currentView: EditorView | null = null;
  * @param snippetsManager 
  * @returns ViewPluginExtension. Create a plugin for a class whose constructor takes a single editor view as argument.
  */
-export function CodeMirrorExtension(synchronization : Synchronization, snippetsManager: SnippetsManager, textboxesManager: TextboxesManager, notebookTracker : INotebookTracker): Extension {
+export function CodeMirrorExtension(synchronization : Synchronization, snippetsManager: SnippetsManager, _textboxesManager: TextboxesManager, highlightsManager: HighlightsManager, notebookTracker : INotebookTracker): Extension {
   if(!saveSnippetListenerRegistered){
     saveSnippetListenerRegistered = true;
 
@@ -171,8 +172,7 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
             if (!cellId){ return; }
 
             const notebookId : string = notebookTracker.currentWidget.context.path
-            const snippet = snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
-            textboxesManager.dropTextboxes(snippet);
+            snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
             snippetsManager.update(cellId,currentView!);
             snippetsManager.assignDecorations(currentView!, cellId);
 
@@ -245,16 +245,21 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
           }
           
           // console.log("MADE IT PAST THE RETURN")
-          update.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+          update.changes.iterChanges((_fromA, _toA, _fromB, _toB, inserted) => {
             for(const snippet of editedSnippets){
-              textboxesManager.updateTextboxes(snippet, update, this.view);
+              // OLD textbox system - disabled in favor of new diff-based highlights
+              // textboxesManager.updateTextboxes(snippet, update, this.view);
               const isWhiteSpace = inserted.length > 0 && /^[ \t\r\n]*$/.test(inserted.toString());
               if(cursorLine >= snippet.start_line && cursorLine <= snippet.end_line && (!isWhiteSpace)) {
-                let charsInserted = inserted.toString().length
-                if(charsInserted === 0){
-                  charsInserted = fromA - toA;
-                }
-                textboxesManager.diffCheck(snippet, charsInserted);
+                // OLD textbox system - disabled
+                // let charsInserted = inserted.toString().length
+                // if(charsInserted === 0){
+                //   charsInserted = fromA - toA;
+                // }
+                // textboxesManager.diffCheck(snippet, charsInserted);
+
+                // NEW: Apply diff-based highlights
+                highlightsManager.onSnippetEdit(snippet);
               }
             }
           });
