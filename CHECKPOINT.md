@@ -1,14 +1,14 @@
 # Implementation Checkpoint
 
 **Date:** 2026-02-04
-**Status:** Phase 1-4 complete, Phase 2 template updates have infinite loop bug
+**Status:** Phase 1-4 complete. Placeholder updates now use merged diffs; remaining bug with last placeholder not clearing.
 
 ---
 
 ## Current Status
 
 Phases 1, 3, and 4 are **complete and working** for single snippets.
-Phase 2 (template placeholder updates) has an **infinite loop bug** with multiple snippets.
+Phase 2 (template placeholder updates) has been refactored to use **merged diffs across snippets**. Infinite loop resolved, but a **last-placeholder not clearing** bug remains.
 
 ---
 
@@ -39,9 +39,9 @@ Phase 2 (template placeholder updates) has an **infinite loop bug** with multipl
 - Removed whitespace check that was preventing line-count detection
 
 ### Phase 2: Template Placeholder Updates ⚠️ (Has Bug)
-- `updateTemplatePlaceholders()` is called when snippets diverge
+- Placeholder updates now computed from **merged diffs across all snippets**
 - LibraryWidget is notified via `'updateLibrary'` event
-- **BUG:** Infinite loop occurs when multiple snippets exist
+- **BUG:** When all snippets revert to match, the last placeholder sometimes remains
 
 ### CLI Testing Tool ✅
 - **Files:** `src/cli/diffTester.ts`, `src/cli/formatOutput.ts`, `src/cli/types.ts`
@@ -52,25 +52,12 @@ Phase 2 (template placeholder updates) has an **infinite loop bug** with multipl
 
 ## Current Issues
 
-### 1. Infinite Loop Bug 🔴
-**Symptom:** Console shows thousands of "Applied X highlight(s)" messages when multiple snippets exist
-**Location:** Triggered from `HighlightsManager.ts` → template update → something re-triggers edit
-
-**Attempted fix:** Added `isUpdating` guard flag - didn't fully resolve
-
+### 1. Last Placeholder Not Clearing 🔴
+**Symptom:** With multiple snippets, after reverting all to match the template, one final placeholder remains in the template.
+**Repro:** Template `x = 1\ny = 1`, Snippet A -> `x = 2`, Snippet B -> `y = 3`, then revert B then A. After last revert, one `{{}}` persists.
 **Suspected causes:**
-1. `updateLibrary` event may trigger something that re-processes snippets
-2. Multiple snippets each trigger the logic separately
-3. Template content change may cause cascade
-
-**Investigation needed:**
-- Trace full call chain when infinite loop occurs
-- Check if LibraryWidget's `handleUpdateLibrary` triggers CodeMirror updates
-- Consider debouncing or batching template updates
-
-### 2. Competing Snippets (Partially Fixed)
-- ✅ Fixed: Snippet B no longer clears template placeholders when it matches
-- ❓ Template placeholders now persist even when all snippets match again
+1. Merged diff computation leaves a stale region when diffs drop to zero
+2. Placeholder updates still using stale template content or positions
 
 ---
 
@@ -84,8 +71,7 @@ Phase 2 (template placeholder updates) has an **infinite loop bug** with multipl
 
 ## Not Working (Multiple Snippets)
 
-1. 🔴 Multiple snippets cause infinite loop
-2. ⚠️ Template `{{}}` markers don't auto-clear when all snippets match
+1. 🔴 Template `{{}}` markers sometimes do not auto-clear when all snippets match (last placeholder persists)
 
 ---
 

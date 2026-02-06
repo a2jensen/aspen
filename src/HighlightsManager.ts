@@ -11,7 +11,7 @@
 import { computeDiffs, stripPlaceholders, updateTemplatePlaceholders } from './diffEngine';
 import { SnippetsManager } from './snippetManager';
 import { TemplatesManager } from './TemplatesManager';
-import { ISnippet } from './types';
+import { DiffRegion, ISnippet } from './types';
 
 export class HighlightsManager {
   private templatesManager: TemplatesManager;
@@ -24,6 +24,112 @@ export class HighlightsManager {
   ) {
     this.templatesManager = templatesManager;
     this.snippetsManager = snippetsManager;
+  }
+
+  private mergeDiffsForTemplate(
+    cleanTemplateContent: string,
+    diffsList: DiffRegion[][]
+  ): DiffRegion[] {
+    const templateLines = cleanTemplateContent.split('\n');
+    const rangesByLine = new Map<number, { from: number; to: number }[]>();
+    const insertionsByLine = new Map<number, Set<number>>();
+
+    for (const diffs of diffsList) {
+      for (const diff of diffs) {
+        const { line, templateFrom, templateTo, templateContent } = diff;
+
+        if (templateFrom === templateTo && templateContent.length === 0) {
+          if (!insertionsByLine.has(line)) {
+            insertionsByLine.set(line, new Set());
+          }
+          insertionsByLine.get(line)!.add(templateFrom);
+          continue;
+        }
+
+        if (!rangesByLine.has(line)) {
+          rangesByLine.set(line, []);
+        }
+        rangesByLine.get(line)!.push({ from: templateFrom, to: templateTo });
+      }
+    }
+
+    const merged: DiffRegion[] = [];
+
+    for (const [line, ranges] of rangesByLine.entries()) {
+      const lineText = templateLines[line] ?? '';
+      const sorted = ranges
+        .map(r => ({
+          from: Math.max(0, Math.min(r.from, lineText.length)),
+          to: Math.max(0, Math.min(r.to, lineText.length))
+        }))
+        .sort((a, b) => a.from - b.from);
+
+      const mergedRanges: { from: number; to: number }[] = [];
+      for (const range of sorted) {
+        const last = mergedRanges[mergedRanges.length - 1];
+        if (!last || range.from > last.to) {
+          mergedRanges.push({ ...range });
+        } else {
+          last.to = Math.max(last.to, range.to);
+        }
+      }
+
+      for (const range of mergedRanges) {
+        if (range.from === range.to) continue;
+        merged.push({
+          line,
+          templateFrom: range.from,
+          templateTo: range.to,
+          templateContent: lineText.slice(range.from, range.to),
+          snippetFrom: range.from,
+          snippetTo: range.to,
+          snippetContent: ''
+        });
+      }
+
+      const insertionPoints = insertionsByLine.get(line);
+      if (insertionPoints && insertionPoints.size > 0) {
+        for (const point of insertionPoints) {
+          const isInsideRange = mergedRanges.some(
+            range => point >= range.from && point <= range.to
+          );
+          if (isInsideRange) {
+            continue;
+          }
+          const clampedPoint = Math.max(0, Math.min(point, lineText.length));
+          merged.push({
+            line,
+            templateFrom: clampedPoint,
+            templateTo: clampedPoint,
+            templateContent: '',
+            snippetFrom: clampedPoint,
+            snippetTo: clampedPoint,
+            snippetContent: ''
+          });
+        }
+      }
+    }
+
+    for (const [line, points] of insertionsByLine.entries()) {
+      if (rangesByLine.has(line)) continue;
+      const lineText = templateLines[line] ?? '';
+      for (const point of points) {
+        const clampedPoint = Math.max(0, Math.min(point, lineText.length));
+        merged.push({
+          line,
+          templateFrom: clampedPoint,
+          templateTo: clampedPoint,
+          templateContent: '',
+          snippetFrom: clampedPoint,
+          snippetTo: clampedPoint,
+          snippetContent: ''
+        });
+      }
+    }
+
+    return merged.sort((a, b) =>
+      a.line === b.line ? a.templateFrom - b.templateFrom : a.line - b.line
+    );
   }
 
   /**
@@ -65,19 +171,38 @@ export class HighlightsManager {
     }
 
     // 5. If no diffs for this snippet, just clear its highlights
-    // Don't modify template placeholders - other snippets may have diffs
     if (diffs.length === 0) {
       this.snippetsManager.clearSnippetHighlights(snippet.id);
-      return;
+    } else {
+      // 6. Apply highlights based on diff regions
+      this.snippetsManager.applyDiffHighlights(snippet, diffs, template.color);
     }
 
-    // 6. Apply highlights based on diff regions
-    this.snippetsManager.applyDiffHighlights(snippet, diffs, template.color);
-
-    // 7. Update template content with {{}} placeholders around diff regions
+    // 7. Update template content with {{}} placeholders based on all snippets
     this.isUpdating = true;
     try {
-      const updatedTemplateContent = updateTemplatePlaceholders(template.content, diffs);
+      const snippets = this.snippetsManager.getSnippets(template.id);
+      const allDiffs: DiffRegion[][] = [];
+
+      for (const instance of snippets) {
+        const instanceDiffs = computeDiffs(cleanTemplateContent, instance.content);
+        if (instanceDiffs === null) {
+          requestAnimationFrame(() => {
+            this.snippetsManager.unsync(instance.id);
+          });
+          continue;
+        }
+        allDiffs.push(instanceDiffs);
+      }
+
+      const hasAnyDiffs = allDiffs.some(diffsForSnippet => diffsForSnippet.length > 0);
+
+      const updatedTemplateContent = hasAnyDiffs
+        ? updateTemplatePlaceholders(
+            cleanTemplateContent,
+            this.mergeDiffsForTemplate(cleanTemplateContent, allDiffs)
+          )
+        : cleanTemplateContent;
       if (updatedTemplateContent !== template.content) {
         this.templatesManager.edit(template.id, updatedTemplateContent);
         // Notify LibraryWidget to refresh
