@@ -21,6 +21,7 @@ import { Synchronization } from './Synchronization';
 // Create a global flag to track if the event listener has been registered
 let saveSnippetListenerRegistered = false;
 let currentView: EditorView | null = null;
+let lastSelection: { from: number; to: number } | null = null;
 
  function getCellIdFromEditor(view: EditorView | undefined): string | undefined {
   if (!view) {
@@ -60,9 +61,22 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
         }
 
         const selection = currentView.state.selection.main;
-        const startLine = currentView.state.doc.lineAt(selection.from).number;
-        const endLine = currentView.state.doc.lineAt(selection.to).number;
-        const droppedText = currentView.state.sliceDoc(selection.from, selection.to).trim();
+        const useSelection =
+          selection.from !== selection.to
+            ? selection
+            : lastSelection
+              ? { from: lastSelection.from, to: lastSelection.to }
+              : selection;
+
+        if (selection.from === selection.to && lastSelection) {
+          console.warn("Save Code Snippet: using last non-empty selection.");
+        }
+
+        const startLine = currentView.state.doc.lineAt(useSelection.from).number;
+        const endLine = currentView.state.doc.lineAt(useSelection.to).number;
+        const droppedText = currentView.state
+          .sliceDoc(useSelection.from, useSelection.to)
+          .trim();
 
         if (!droppedText) {
           console.warn("Skipping empty snippet");
@@ -83,7 +97,7 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
           if (!cellId) return;
 
           snippetsManager.update(cellId, currentView!);
-          snippetsManager.create(
+          const newSnippet = snippetsManager.create(
             currentView!,
             startLine,
             endLine,
@@ -93,6 +107,7 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
             cellId
           );
           snippetsManager.assignDecorations(currentView!, cellId);
+          highlightsManager.onSnippetEdit(newSnippet);
         }, 10);
 
         const cursorPos = selection.to;
@@ -172,9 +187,10 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
             if (!cellId){ return; }
 
             const notebookId : string = notebookTracker.currentWidget.context.path
-            snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
+            const newSnippet = snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
             snippetsManager.update(cellId,currentView!);
             snippetsManager.assignDecorations(currentView!, cellId);
+            highlightsManager.onSnippetEdit(newSnippet);
 
             // move cursor to end of inserted text, so that there is no selection
             const cursorPos = dropPos + droppedText.length;
@@ -230,27 +246,36 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
         const cellId = getCellIdFromEditor(update.view);
         if (!cellId){ return; }
 
-        const cursorPos = update.state.selection.main.head;
+        const selection = update.state.selection.main;
+        if (selection.from !== selection.to) {
+          lastSelection = { from: selection.from, to: selection.to };
+        }
+
+        const cursorPos = selection.head;
         const cursorLine = update.state.doc.lineAt(cursorPos).number;
         const editedSnippets : ISnippet[] = snippetsManager.snippetTracker.filter(s => s.cell_id === cellId);
 
-        if (update.docChanged || update.transactions.length > 0) {
-          // update snippets
-          snippetsManager.update(cellId, update.view, update);
+        if (!update.docChanged) {
+          // Refresh snippet borders on non-doc transactions (e.g., toggle highlight, selection changes).
           this.decorations = snippetsManager.assignDecorations(update.view, cellId);
-          
-          if (synchronization.syncAction()) {
-            console.log("Detected a sync action! returning early and not running diff checks ")
-            return;
-          }
-          
-          // Check all edited snippets for diff-based highlights
-          for (const snippet of editedSnippets) {
-            // Call onSnippetEdit for any change within snippet bounds
-            // The diff engine will handle line count mismatches (unsync) and content diffs (highlights)
-            if (cursorLine >= snippet.start_line && cursorLine <= snippet.end_line) {
-              highlightsManager.onSnippetEdit(snippet);
-            }
+          return;
+        }
+
+        // update snippets
+        snippetsManager.update(cellId, update.view, update);
+        this.decorations = snippetsManager.assignDecorations(update.view, cellId);
+        
+        if (synchronization.syncAction()) {
+          console.log("Detected a sync action! returning early and not running diff checks ")
+          return;
+        }
+        
+        // Check all edited snippets for diff-based highlights
+        for (const snippet of editedSnippets) {
+          // Call onSnippetEdit for any change within snippet bounds
+          // The diff engine will handle line count mismatches (unsync) and content diffs (highlights)
+          if (cursorLine >= snippet.start_line && cursorLine <= snippet.end_line) {
+            highlightsManager.onSnippetEdit(snippet);
           }
         }
       }

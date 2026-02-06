@@ -1,145 +1,172 @@
 # Implementation Checkpoint
 
-**Date:** 2026-02-02
-**Branch:** `user-study`
+**Date:** 2026-02-04
+**Status:** Phase 1-4 complete, Phase 2 template updates have infinite loop bug
 
 ---
 
 ## Current Status
 
-Phase 1 and 2 of the diff/highlight system rewrite are **complete**.
+Phases 1, 3, and 4 are **complete and working** for single snippets.
+Phase 2 (template placeholder updates) has an **infinite loop bug** with multiple snippets.
 
-### Completed Work
+---
 
-#### Phase 1: Types ✅
-- Added `DiffRegion` interface to `src/types.ts`
-- Added `PlaceholderPosition` interface to `src/types.ts`
+## Completed Work
+
+### Phase 1: Diff Engine ✅
+- **File:** `src/diffEngine.ts`
+- `computeDiffs()` - compares template vs snippet, returns `DiffRegion[]` or `null` for line mismatch
+- `stripPlaceholders()` - removes `{{}}` markers from template content
+- `parsePlaceholders()` - finds `{{}}` marker positions
+- `updateTemplatePlaceholders()` - adds `{{}}` markers based on diffs
+- `computeDiffsFromTemplate()` - convenience wrapper
+
+### Phase 3: CodeMirror Decoration Application ✅
+- **File:** `src/snippetManager.ts`
+- Added `applyDiffHighlights()` - applies background highlights to snippet based on `DiffRegion[]`
+- Added `clearSnippetHighlights()` - removes highlights from a snippet
+- Added `snippetDecorations: Map<string, DecorationSet>` for tracking
+- Uses `requestAnimationFrame()` to avoid "dispatch during update" errors
+
+### Phase 4: Integration ✅
+- **File:** `src/HighlightsManager.ts` (new)
+- Orchestrates diff computation and highlight application
+- Called from `CodeMirrorPlugin.ts` on every snippet edit
+- **File:** `src/CodeMirrorPlugin.ts`
+- Disabled old textbox system calls (commented out)
+- Added `highlightsManager.onSnippetEdit(snippet)` call
+- Removed whitespace check that was preventing line-count detection
+
+### Phase 2: Template Placeholder Updates ⚠️ (Has Bug)
+- `updateTemplatePlaceholders()` is called when snippets diverge
+- LibraryWidget is notified via `'updateLibrary'` event
+- **BUG:** Infinite loop occurs when multiple snippets exist
+
+### CLI Testing Tool ✅
+- **Files:** `src/cli/diffTester.ts`, `src/cli/formatOutput.ts`, `src/cli/types.ts`
+- **Test cases:** `test-cases/*.json`
+- Run with: `npx tsx src/cli/diffTester.ts test-cases/replacement.json`
+
+---
+
+## Current Issues
+
+### 1. Infinite Loop Bug 🔴
+**Symptom:** Console shows thousands of "Applied X highlight(s)" messages when multiple snippets exist
+**Location:** Triggered from `HighlightsManager.ts` → template update → something re-triggers edit
+
+**Attempted fix:** Added `isUpdating` guard flag - didn't fully resolve
+
+**Suspected causes:**
+1. `updateLibrary` event may trigger something that re-processes snippets
+2. Multiple snippets each trigger the logic separately
+3. Template content change may cause cascade
+
+**Investigation needed:**
+- Trace full call chain when infinite loop occurs
+- Check if LibraryWidget's `handleUpdateLibrary` triggers CodeMirror updates
+- Consider debouncing or batching template updates
+
+### 2. Competing Snippets (Partially Fixed)
+- ✅ Fixed: Snippet B no longer clears template placeholders when it matches
+- ❓ Template placeholders now persist even when all snippets match again
+
+---
+
+## Working Features (Single Snippet)
+
+1. ✅ Snippet highlights when content diverges from template
+2. ✅ Highlights clear when content matches template again
+3. ✅ Auto-unsync when line count changes (press Enter)
+4. ✅ Template shows `{{}}` markers when snippet diverges
+5. ✅ Multiple edits on same line show multiple highlights
+
+## Not Working (Multiple Snippets)
+
+1. 🔴 Multiple snippets cause infinite loop
+2. ⚠️ Template `{{}}` markers don't auto-clear when all snippets match
+
+---
+
+## File Changes Summary
+
+| File | Status | Changes |
+|------|--------|---------|
+| `src/diffEngine.ts` | ✅ | Core diff logic, placeholder functions |
+| `src/HighlightsManager.ts` | ⚠️ | Orchestrates highlights, has infinite loop bug |
+| `src/snippetManager.ts` | ✅ | `applyDiffHighlights()`, `clearSnippetHighlights()` |
+| `src/CodeMirrorPlugin.ts` | ✅ | Disabled old textbox calls, integrated HighlightsManager |
+| `src/index.ts` | ✅ | Added HighlightsManager initialization |
+| `src/types.ts` | ✅ | Added `DiffRegion`, `PlaceholderPosition` interfaces |
+| `src/cli/` | ✅ | CLI testing tool for diff engine |
+| `test-cases/` | ✅ | JSON test cases for CLI tool |
+
+---
+
+## Quick Fix to Disable Template Updates
+
+To temporarily disable template placeholder updates and just have snippet-side highlights (which work fine):
+
+In `src/HighlightsManager.ts`, comment out lines 71-85:
 
 ```typescript
-export interface DiffRegion {
-  line: number;
-  templateFrom: number;
-  templateTo: number;
-  templateContent: string;
-  snippetFrom: number;
-  snippetTo: number;
-  snippetContent: string;
-}
-
-export interface PlaceholderPosition {
-  line: number;
-  from: number;
-  to: number;
-  content: string;
-}
+// 7. Update template content with {{}} placeholders around diff regions
+// this.isUpdating = true;
+// try {
+//   const updatedTemplateContent = updateTemplatePlaceholders(template.content, diffs);
+//   if (updatedTemplateContent !== template.content) {
+//     this.templatesManager.edit(template.id, updatedTemplateContent);
+//     document.dispatchEvent(new CustomEvent('updateLibrary', {
+//       detail: { value: updatedTemplateContent }
+//     }));
+//     console.log(`Updated template ${template.id} with placeholders`);
+//   }
+// } finally {
+//   this.isUpdating = false;
+// }
 ```
 
-#### Phase 2: Core Diff Logic ✅
-- Created `src/diffEngine.ts` with pure functions (no side effects)
-- Created `src/__tests__/diffEngine.spec.ts` with 31 unit tests
-
-**Functions implemented:**
-| Function | Purpose |
-|----------|---------|
-| `stripPlaceholders(content)` | Removes `{{}}` markers, keeps inner text |
-| `parsePlaceholders(content)` | Finds all `{{}}` positions in content |
-| `computeDiffs(template, snippet)` | Returns `DiffRegion[]` or `null` if line counts differ |
-| `updateTemplatePlaceholders(template, diffs)` | Adds/updates `{{}}` markers based on diffs |
-| `computeDiffsFromTemplate(template, snippet)` | Convenience wrapper (strips + computes) |
-
-**Test results:** 31 passing tests
-
----
-
-## Remaining Phases
-
-### Phase 3: CodeMirror Decoration Application
-- Create `highlightDecorations.ts`
-- Build CodeMirror `Decoration.mark()` ranges from `DiffRegion[]`
-- Handle template-side (from `{{}}` markers) and snippet-side (from diffs)
-
-### Phase 4: Integration (HighlightsManager)
-- Create new `HighlightsManager` class
-- Wire up to `CodeMirrorPlugin`
-- Call diff engine on every edit
-- Apply decorations to editor
-
-### Phase 5: Cleanup
-- Remove old `TextboxesManager.ts`
-- Remove old textbox-related code from `CodeMirrorPlugin.ts`
-- Update any imports/references
-
-### Phase 6: Edge Cases & Polish
-- Test with real notebooks
-- Handle edge cases (empty cells, rapid edits, etc.)
-- Performance profiling if needed
-
----
-
-## Key Design Decisions
-
-1. **Highlights are range markers** - they mark regions, not classify content
-2. **Line structure must match** - different line counts → auto-unsync
-3. **Diff runs on every edit** - no debouncing, immediate feedback
-4. **Empty ranges show nothing** - `from === to` means no visual marker
-5. **Adjacent highlights merge** - consecutive diff regions combine
-6. **Template shows "region varies"** - not all variant values
-
----
-
-## Files Modified/Created
-
-| File | Status |
-|------|--------|
-| `src/types.ts` | Modified (added interfaces) |
-| `src/diffEngine.ts` | Created |
-| `src/__tests__/diffEngine.spec.ts` | Created |
-| `TESTING.md` | Created |
-| `IMPLEMENTATION_PLAN.md` | Created |
-| `DESIGN.md` | Modified |
-| `DIFFS.md` | Modified |
-| `package.json` | Modified (added test scripts) |
-
----
-
-## How to Run Tests
-
-```bash
-# Run all diff engine tests
-npm run test:unit -- src/__tests__/diffEngine.spec.ts
-
-# Run with verbose debug output (shows Input/Expected/Actual)
-npm run test:debug -- src/__tests__/diffEngine.spec.ts
-
-# Run all tests with coverage
-npm run test
-```
+This gives working snippet-side highlights without the infinite loop.
 
 ---
 
 ## Next Steps
 
-When resuming the phase walkthrough, start with **Phase 3: CodeMirror Decoration Application**. BUT FOR NOW DO THIS:
+1. **Debug infinite loop:**
+   - Add logging to trace exact call chain
+   - Check LibraryWidget's `handleUpdateLibrary` method
+   - Consider per-template or per-update-cycle guards instead of simple boolean
 
-IMPLEMENTATION OF A CUSTOM CLI TOOL SEPARATE FROM THE JEST TESTS:
-What needs to be implemented next is CLI tool or some interaction with being able to test this diffing visual system in-memory through the terminal.
+2. **Alternative approaches:**
+   - Debounce template updates (e.g., only update after 500ms of no edits)
+   - Only update template on explicit user action (not automatic)
+   - Use a Set to track processed snippets per update cycle
 
-This is the expected behavior:
-- I should be able to provide through a JSON file the template and its snippet instances
-- It should then output to the terminal a result of where highlights should be placed.
+3. **Phase 5 (after bugs fixed):**
+   - Remove old TextboxesManager code entirely
+   - Clean up unused imports and methods
 
-Example:
-- Template: "Hello"
-- Instances: "Hello World"
+---
 
----> Result: 
-- Highlights -> Data Structure Display
-- Instances: "Hello World" say "World" is highlighted or something....
+## Test Commands
 
-FIRST WRITE OUT A PLAN FOR TESTING OUT THIS TOOL
+```bash
+# Build and run JupyterLab
+jlpm build && jupyter lab
 
-Reference documents:
-- `IMPLEMENTATION_PLAN.md` - Full 6-phase plan with details
-- `DIFFS.md` - Highlight system rules and cases
-- `DESIGN.md` - Overall architecture
-- `TESTING.md` - Testing guide
+# Run CLI diff tester
+npx tsx src/cli/diffTester.ts test-cases/replacement.json
+
+# Run all test cases
+npx tsx src/cli/diffTester.ts test-cases/
+```
+
+---
+
+## Key Files to Review
+
+- `src/HighlightsManager.ts` - Main orchestration, has the bug
+- `src/CodeMirrorPlugin.ts` - Integration point, lines 248-255
+- `src/LibraryWidget.tsx` - Check `handleUpdateLibrary` method
+- `src/diffEngine.ts` - Core logic, works correctly

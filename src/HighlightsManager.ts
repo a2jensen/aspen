@@ -8,7 +8,7 @@
  * Called on every snippet edit to recompute and apply highlights.
  */
 
-import { computeDiffs, stripPlaceholders } from './diffEngine';
+import { computeDiffs, stripPlaceholders, updateTemplatePlaceholders } from './diffEngine';
 import { SnippetsManager } from './snippetManager';
 import { TemplatesManager } from './TemplatesManager';
 import { ISnippet } from './types';
@@ -16,6 +16,7 @@ import { ISnippet } from './types';
 export class HighlightsManager {
   private templatesManager: TemplatesManager;
   private snippetsManager: SnippetsManager;
+  private isUpdating: boolean = false; // Guard against infinite loops
 
   constructor(
     templatesManager: TemplatesManager,
@@ -31,6 +32,11 @@ export class HighlightsManager {
    * @param snippet - The snippet that was edited
    */
   onSnippetEdit(snippet: ISnippet): void {
+    // Guard against infinite loops
+    if (this.isUpdating) {
+      return;
+    }
+
     // 1. Get the template
     const template = this.templatesManager.get(snippet.template_id);
     if (!template) {
@@ -58,7 +64,8 @@ export class HighlightsManager {
       return;
     }
 
-    // 5. If no diffs, clear highlights
+    // 5. If no diffs for this snippet, just clear its highlights
+    // Don't modify template placeholders - other snippets may have diffs
     if (diffs.length === 0) {
       this.snippetsManager.clearSnippetHighlights(snippet.id);
       return;
@@ -66,6 +73,22 @@ export class HighlightsManager {
 
     // 6. Apply highlights based on diff regions
     this.snippetsManager.applyDiffHighlights(snippet, diffs, template.color);
+
+    // 7. Update template content with {{}} placeholders around diff regions
+    this.isUpdating = true;
+    try {
+      const updatedTemplateContent = updateTemplatePlaceholders(template.content, diffs);
+      if (updatedTemplateContent !== template.content) {
+        this.templatesManager.edit(template.id, updatedTemplateContent);
+        // Notify LibraryWidget to refresh
+        document.dispatchEvent(new CustomEvent('updateLibrary', {
+          detail: { value: updatedTemplateContent }
+        }));
+        console.log(`Updated template ${template.id} with placeholders`);
+      }
+    } finally {
+      this.isUpdating = false;
+    }
 
     // Debug logging
     console.log(`Applied ${diffs.length} highlight(s) to snippet ${snippet.id}`);
