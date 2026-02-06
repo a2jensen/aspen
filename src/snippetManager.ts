@@ -3,10 +3,10 @@
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/quotes */
 /* eslint-disable prettier/prettier */
-import { RangeSetBuilder, StateEffect, Range, StateField, Annotation } from '@codemirror/state';
+import { RangeSetBuilder, StateEffect, StateField } from '@codemirror/state';
 import { ContentsManager } from "@jupyterlab/services";
 import { TemplatesManager } from './TemplatesManager';
-import { DiffRegion, ISnippet, ITemplate, ITextbox } from './types';
+import { DiffRegion, ISnippet } from './types';
 import { FormattedContent } from './LibraryWidget';
 import {
   Decoration,
@@ -26,9 +26,6 @@ import { getTriggeredByCtrlEnter, setTriggeredByCtrlEnter } from './customkeyBin
  * It maintains the connection between snippet/template instances in the editor and their templates.
  */
 
-// Defining annotation for when textbox changes document to prevent diff check from running when a textbox updates
-export const InternalUpdate = Annotation.define<boolean>();
-export const UpdateDocument = Annotation.define<boolean>();
 // Defining StateEffect and StateField for textbox updates
 export const updateTextboxEffect = StateEffect.define<DecorationSet>();
 export const textboxStateField = StateField.define<DecorationSet>({
@@ -50,7 +47,6 @@ export class SnippetsManager {
   public snippetTracker: ISnippet[]; /** Array to keep track of all active snippets */
   public cellMap: Map<string,EditorView>; /** Map to associate editor views with their unique cell IDs */
   private templatesManager : TemplatesManager;
-  private textboxMap: Map<number, Range<Decoration>>; /** Map to help track textbox decorations for updates */
   private snippetDecorations: Map<string, DecorationSet>; /** Map of snippetId → decorations for diff highlights */
 
   /**
@@ -60,7 +56,6 @@ export class SnippetsManager {
     this.snippetTracker = [];
     this.cellMap = new Map();
     this.templatesManager = templates;
-    this.textboxMap = new Map<number, Range<Decoration>>();
     this.snippetDecorations = new Map<string, DecorationSet>();
     
 
@@ -69,13 +64,11 @@ export class SnippetsManager {
     document.addEventListener('TemplateDeleted', (event: Event) => {
       const customEvent = event as CustomEvent;
       const templateID = customEvent.detail.templateID;
-      let textboxes : ITextbox[] = customEvent.detail.textboxes;
       const snippetsToRemove = this.getSnippets(templateID);
       this.deleteSnippetsByTemplate(templateID);
       
       for(const snippet of snippetsToRemove){
-        let snippetTextboxes = textboxes.filter(t => t.snippetId === snippet.id);
-        this.removeSnippetTextboxDecos(snippet, snippetTextboxes);
+        this.clearSnippetHighlights(snippet.id);
       }
     });
   }
@@ -217,14 +210,7 @@ export class SnippetsManager {
     }
 
     this.snippetTracker = this.snippetTracker.filter(s => s.id !== snippetId);
-    const template = this.templatesManager.get(snippet.template_id);
-     if (!template){
-      console.warn("Template not found during unsync");
-      return;
-    }
-    const textboxes = template.textboxes.filter(t => t.snippetId === snippetId);
-    this.removeSnippetTextboxDecos(snippet, textboxes);
-    template.textboxes = template.textboxes.filter(t => t.snippetId !== snippetId);
+    this.clearSnippetHighlights(snippetId);
   }
 
   getView(id: string) : EditorView | undefined{
@@ -359,56 +345,6 @@ export class SnippetsManager {
     }
   }
 
-  /**
-   * Method to validate textbox decorations in the `textboxMap` before they are dispatched to the editor view. Checks if each entry in
-   * the `textboxMap` has a valid textbox ID. 
-   * @param snippet - The snippet where textboxes are being validated. Used to get the `EditorView`. 
-   * @param decoset - Optional parameter to pass in the current `DecorationSet,` set of textbox decorations in the editor.
-   * @returns The updated `DecorationSet` to be dispatched.
-   */
-
-  private validateHighlights(snippet: ISnippet, decoset?: DecorationSet): DecorationSet | undefined {
-    const targetView = this.getView(snippet.cell_id);
-    if (!targetView) return undefined;
-
-    const templates = this.templatesManager.getTemplates();
-    if (!templates) return undefined;
-
-    const validTextboxIds = new Set;
-    const currDecos = decoset || targetView.state.field(textboxStateField);
-
-    for(const template of templates){
-      template.textboxes.filter(t => t.snippetId).forEach(t => validTextboxIds.add(t.id));
-    }
-
-    let updatedDecos = currDecos;
-
-    const toRemove: number[] = [];
-    
-    this.textboxMap.forEach((deco, id) => {
-      // const widget = deco.value.spec.widget as TextboxWidget;
-      if(!validTextboxIds.has(id)){
-        toRemove.push(id);
-      }
-    });
-
-    if (toRemove.length === 0) {
-      return undefined;
-    }
-
-    toRemove.forEach(id => {
-      this.textboxMap.delete(id);
-    });
-
-    updatedDecos = updatedDecos.update({
-      filter: (from, to, value) => {
-        return !toRemove.includes(value.spec.textboxId);
-      }
-    });
-
-    return updatedDecos;
-  }
-
   private hexToRgba(hex: string): string {
     hex = hex.replace(/^#/, '');
 
@@ -417,154 +353,6 @@ export class SnippetsManager {
     const b = parseInt(hex.slice(4, 6), 16);
 
     return `rgba(${r}, ${g}, ${b}, 0.4`;
-  }
-
-  /**
-   * Function to dispatch textbox decorations in a particular `EditorView`/cell. Updates document content when needed. 
-   * 
-   * @param snippetId - The ID of the snippet where the textbox is linked to.
-   * @param template - The template linked to the snippet. 
-   * @param line - The line (relative to the template/snippet) where the textbox is located.
-   * @param charRange - The character range ([from, to]) of the textbox that is being dispatched.
-   * @param textboxId - The ID of the textbox that is being dispatched.
-   * @param updateDoc - Optional flag indicating whether the changes dispatched should update the document or not. Only true for empty textboxes which require an additional space(s).
-   */
-
-  async applyHighlights(snippetId: string, template: ITemplate, line: number, charRange: number[], textboxId: number, updateDoc?: boolean) {
-    const snippet = this.snippetTracker.find(s => s.id === snippetId);
-    const targetView = this.getView(snippet!.cell_id);
-
-    if (!snippet || !targetView) {
-      return Decoration.none;
-    }
-
-    return new Promise((resolve) => {
-      requestAnimationFrame(() => {
-        const currDecos = targetView.state.field(textboxStateField);
-        
-        const doc = targetView.state.doc;
-        const targetLine = doc.line(snippet.start_line + line);
-        let from = targetLine.from + charRange[0];
-        let to = targetLine.from + charRange[1];
-
-        const oldDeco = this.textboxMap.get(textboxId);
-        if(oldDeco){
-          this.textboxMap.delete(textboxId);
-        }
-
-        let updatedDecos = currDecos.update({
-          filter: (from, to, value) => {
-            return value.spec.textboxId !== textboxId;
-          }
-        });
-
-        let docChange;
-        if(updateDoc){
-          if(charRange[0] !== charRange[1]){
-            docChange = {from: from - 1, to: from - 1, insert: "  "};
-          }
-          else{
-            docChange = {from: from, to: to, insert: " "};
-            to += 1;
-          }
-        }
-
-        const newTargetLineTo = docChange ? targetLine.to + docChange.insert.length : targetLine.to;
-
-        if(to > newTargetLineTo){
-          to -= 1 
-          if(from === to){
-            from -= 1;
-          }
-        }
-
-        const color = this.hexToRgba(template.color) || '#7a7a7a83'
-
-        const newDeco = Decoration.mark({
-          attributes: {
-            style : `background-color: ${color}`
-          },
-          inclusive: false,
-          textboxId: textboxId
-        }).range(from, to);
-
-        updatedDecos = updatedDecos.update({
-          add: [newDeco]
-        });
-  
-        this.textboxMap.set(textboxId, newDeco);
-
-        const validatedDecos = this.validateHighlights(snippet, updatedDecos) || updatedDecos;
-        targetView.dispatch({
-          effects: updateTextboxEffect.of(validatedDecos),
-          changes: docChange
-        });
-        resolve(validatedDecos);
-      });
-    });
-  }
-
-  /**
-   * Function to delete a particular textbox decoration. 
-   * 
-   * @param id - The ID of the textbox to be removed
-   * @param snippet - The snippet the textbox is linked to.
-   */
-
-  removeTextboxDeco(id: number, snippet: ISnippet){
-    const targetView = this.getView(snippet.cell_id);
-    if(targetView){
-      const currDecos = targetView.state.field(textboxStateField);
-      let updatedDecos = currDecos
-      const deco = this.textboxMap.get(id);
-      if(deco){
-        updatedDecos = updatedDecos.update({
-          filter: (from, to, value) => {
-            return value.spec.textboxId !== id;
-          }
-        });
-        this.textboxMap.delete(id);
-
-        const validatedDecos = this.validateHighlights(snippet, updatedDecos) || updatedDecos;
-
-        targetView?.dispatch({
-          effects: updateTextboxEffect.of(validatedDecos)
-        });
-      }
-    }
-  }
-
-  /**
-   * Function to delete all textbox decorations in a particular snippet. 
-   * 
-   * @param snippet - The snippet to remove all textbox decorations of. 
-   * @param textboxes - The set of textboxes to remove.
-   */
-
-  removeSnippetTextboxDecos(snippet: ISnippet, textboxes: ITextbox[]){
-    const targetView = this.getView(snippet.cell_id);
-    if(targetView){
-      const currDecos = targetView.state.field(textboxStateField);
-      let updatedDecos = currDecos;
-      for(const t of textboxes){
-        const deco = this.textboxMap.get(t.id);
-        if(deco){
-        updatedDecos = updatedDecos.update({
-          filter: (from, to, value) => {
-            return value.spec.textboxId !== t.id;
-          }
-        });
-        this.textboxMap.delete(t.id);
-        }
-      }
-      const validatedDecos = this.validateHighlights(snippet, updatedDecos) || updatedDecos;
-      targetView?.dispatch({
-          effects: updateTextboxEffect.of(validatedDecos)
-      });
-    }
-    else{
-      console.warn("Editor view not found")
-    }
   }
 
   /**

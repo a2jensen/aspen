@@ -48,8 +48,7 @@ export class TemplatesManager {
       dateCreated: new Date(),
       dateUpdated: new Date(),
       tags: [],
-      color: this.assignColor(),
-      textboxes: []
+      color: this.assignColor()
     }
     this.templates.push(template);
     this.activeHighlights.add(template.id);
@@ -90,7 +89,7 @@ export class TemplatesManager {
     try {
       await this.contentsManager.delete(`/snippets/${template.name}.json`);
       document.dispatchEvent(new CustomEvent('TemplateDeleted', {
-        detail: {templateID: templateId, textboxes: template.textboxes}
+        detail: {templateID: templateId}
       }));
     } catch (error : unknown ) {
       console.error(`Failed to delete template ${template.name} ${templateId}`, error);
@@ -168,46 +167,6 @@ export class TemplatesManager {
     };
   }
   
-  removeTextboxDeco(templateId : string , textboxId : number, line : number, innerContent : string) {
-      const template = this.get(templateId);
-
-      if (!template) {
-        console.error("Invalid template fetch - removeTextboxDeco")
-        return
-      }
-
-      const templateContent = template.content.split("\n");
-
-      templateContent.forEach((lineContent, index) => {
-          if (index == line) {
-            console.log("FOUND THE LINE!")
-            const regex = new RegExp(`{{\\s*${innerContent}\\s*}}`, 'g');
-            templateContent[index] = lineContent.replace(regex, innerContent);
-          }
-      })
-      // TODO: NOT WORKING
-      const toKey = (v: string | number): string => v.toString();
-
-      this.templates = this.templates.map(t => {
-        if (toKey(t.id) === toKey(templateId)) {
-          return {
-            ...t,
-            textboxes: (t.textboxes ?? []).filter(tb => toKey(tb.id) !== toKey(textboxId))
-          };
-        }
-        return t;
-      });
-      
-      // log the UPDATED template, not a stale reference
-      const updated = this.templates.find(t => toKey(t.id) === toKey(templateId));
-      console.log("TEMPLATE TEXTBOXES AFTER PROPER REMOVAL", updated?.textboxes);
-      
-
-      console.log("TEMPLATE TEXTBOXES AFTER PROPER REMOVAL", template.textboxes)
-      this.edit(templateId, templateContent.join("\n"))
-  }
-
-
   /**
    * Generates a random color for the specific template and its
    * corresponding snippets
@@ -278,8 +237,7 @@ export class TemplatesManager {
               dateCreated: new Date(templateData.dateCreated || Date.now()),
               dateUpdated: new Date(templateData.dateUpdated || Date.now()),
               tags: templateData.tags || [],        
-              color: templateData.color || "#ffffff",
-              textboxes: [] 
+              color: templateData.color || "#ffffff"
             };
 
             this.templates.push(template);

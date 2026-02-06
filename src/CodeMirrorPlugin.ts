@@ -10,7 +10,6 @@ import {
   keymap
 } from '@codemirror/view';
 import { SnippetsManager, textboxStateField } from './snippetManager';
-import { TextboxesManager } from './TextboxesManager';
 import { HighlightsManager } from './HighlightsManager';
 import { ISnippet } from './types';
 import { defaultKeymap} from '@codemirror/commands';
@@ -45,7 +44,7 @@ let lastSelection: { from: number; to: number } | null = null;
  * @param snippetsManager 
  * @returns ViewPluginExtension. Create a plugin for a class whose constructor takes a single editor view as argument.
  */
-export function CodeMirrorExtension(synchronization : Synchronization, snippetsManager: SnippetsManager, _textboxesManager: TextboxesManager, highlightsManager: HighlightsManager, notebookTracker : INotebookTracker): Extension {
+export function CodeMirrorExtension(synchronization : Synchronization, snippetsManager: SnippetsManager, highlightsManager: HighlightsManager, notebookTracker : INotebookTracker): Extension {
   if(!saveSnippetListenerRegistered){
     saveSnippetListenerRegistered = true;
 

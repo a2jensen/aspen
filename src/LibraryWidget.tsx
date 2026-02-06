@@ -10,8 +10,8 @@ import { copyIcon, editIcon, deleteIcon, caretDownIcon, caretRightIcon } from '@
 import { ITemplate, ISnippet } from "./types";
 import { TemplatesManager } from './TemplatesManager';
 import { SnippetsManager } from './snippetManager';
-import { TextboxesManager } from './TextboxesManager';
 import { Synchronization } from "./Synchronization";
+import { stripPlaceholders } from "./diffEngine";
 
 export type FormattedContent = {
   snippetId : string,
@@ -32,7 +32,6 @@ function Library({
   deleteTemplate,
   renameTemplate,
   editTemplate,
-  textboxEdit,
   syncTemplate,
   toggleTemplateColor,
   activeTemplateHighlightIds,
@@ -42,8 +41,7 @@ function Library({
   snippets: ISnippet[],
   deleteTemplate: (id: string, name: string) => void,
   renameTemplate: (id: string, name: string) => void,
-  editTemplate: (id: string, name: string) => void, // TODO: textboxesEdited needs to be edited to textboxedit type
-  textboxEdit : (templateId : string, newContent : string) => FormattedContent[] | undefined,
+  editTemplate: (id: string, name: string) => void,
   syncTemplate: (id: string, newContent : FormattedContent[]) => void,
   toggleTemplateColor: (id: string) => void,
   activeTemplateHighlightIds: Set<string>,
@@ -141,18 +139,17 @@ function Library({
   const handleEditConfirm = (id: string) => {
     //console.log("finally confirming edit.... gdtting out of Edit Mode! ", newContent)
     if (newContent.trim() !== "") {
-      editTemplate(id, newContent.trim()); // editing the template directly with the new content
-      const newContentFormatted = textboxEdit(id, newContent.trim()); // editing the new content and reformatting it into a state that we can pass into sncTemplate()
-      //editTemplate(id, newContent.trim()); // editing the template directly with the new content
-      
-      if (!newContentFormatted){
-        console.log("RETURN of newContentFormatted is UNDEFINED")
-        return;
+      editTemplate(id, newContent.trim());
+      const cleanContent = stripPlaceholders(newContent.trim());
+      const formatted = snippets
+        .filter(snippet => snippet.template_id === id)
+        .map(snippet => ({
+          snippetId: snippet.id,
+          templateContent: cleanContent
+        }));
+      if (formatted.length > 0) {
+        syncTemplate(id, formatted);
       }
-      //console.log("NEW CONTENT NON FORMATTED", newContent.trim())
-      //console.log("NEW CONTENT FORMATTED FOR SYNC", newContentFormatted.trim())
-      console.log("New content that we are sending to sync ", newContentFormatted)
-      syncTemplate(id, newContentFormatted); // TODO: instead of passing in newContent, we pass in the newly formatted template content from textboxEdit()
       
     }
     setEditingId(null); // exit editing mode
@@ -328,16 +325,14 @@ function Library({
 export class LibraryWidget extends ReactWidget {
   templateManager: TemplatesManager;
   snippetsManager: SnippetsManager;
-  textboxesManager : TextboxesManager;
   synchronizeManager? : Synchronization;
   lastCreatedTemplateId?: string;
 
-  constructor(templatesManager: TemplatesManager, snippetsManager: SnippetsManager, textboxesManager: TextboxesManager ) {
+  constructor(templatesManager: TemplatesManager, snippetsManager: SnippetsManager) {
     super();
     this.addClass("jp-LibraryWidget");
     this.templateManager = templatesManager;
     this.snippetsManager = snippetsManager;
-    this.textboxesManager = textboxesManager;
   }
   
   handleUpdateLibrary = (event: CustomEvent) => {
@@ -392,158 +387,13 @@ export class LibraryWidget extends ReactWidget {
 
 editTemplate = async (id: string, newContent: string) : Promise<void> => {
     try {
-        const template = this.templateManager.get(id);
         this.templateManager.edit(id, newContent);
-        
-        // find all placeholders ({{}}) by line
-        const lines = newContent.split("\n");
-        let matches: {
-          line: number,
-          start: number,
-          end: number,
-          content: string
-        }[] = [];
-
-        lines.forEach((str, line) => {
-          const regex = /{{\s*(.*?)\s*}}/g;
-          let match: RegExpExecArray | null;
-          while((match = regex.exec(str)) !== null){
-            matches.push({
-              line: line,
-              start: match.index,
-              end: match.index + match[1].length,
-              content: match[1].trim(),
-            });
-          }});
-
-        // filter through textbox tracker to find all textboxes in the template
-        const textboxes = template!.textboxes.filter(t => !t.snippetId);
-        if(textboxes.length != matches.length){
-          console.warn("The number of textboxes in the template doesn't match the tracker");
-          return;
-        }
-
-        // sort so that the matches and textboxes are in the correct order (by position)
-        textboxes.sort((a, b) => a.from - b.from);
-        matches.sort((a, b) => a.start - b.start);
-
-        for(let i = 0; i < matches.length; i++){
-          const match = matches[i];
-          const textbox = textboxes[i];
-
-      // if the content is different from the old textbox value -> update
-      if(textbox && textbox.content !== match.content){
-          // const old = textbox.content;
-          textbox.from = match.start;
-          textbox.to = match.end;
-          textbox.content = match.content; 
-      }
-    }
-    this.update();
-
+        this.update();
     } catch ( error : unknown ){
       console.error("Failed to edit template - LibWidget call", error);
     }
   }
 
-  textboxEdited = (templateId : string, newContent : string) : FormattedContent[] | undefined  => {
-    const formattedTemplateContent : FormattedContent[] = []
-    const template = this.templateManager.get(templateId);
-    if (!template){
-      console.error("Failed to fetch template");
-      return;
-    }
-
-    const editedTextboxes: { newTextboxContent: string; sharedId: number }[] = [];
-    const regex = /{{\s*(.*?)\s*}}/g;
-    const oldTemplateContent = template.content.split("\n");
-    const oldTemplateTextboxes = template.textboxes
-
-
-    //console.log("CURRENT TEXTBOXES ", oldTemplateTextboxes)
-    
-    // iterate through old template content and populate textbox content
-    const oldTextboxContent : {innerContent: string, startIndex : number, line : number, sharedId : number}[] = []
-    oldTemplateContent.forEach((line, index) => {
-      const textboxesContent = [...line.matchAll(regex)]
-      //console.log("textboxes found in the old template,  ", textboxesContent);
-
-      // iterate through the textboxes found
-      for (const textbox of textboxesContent) {
-        const innerContent = textbox[1];
-        const startIndex = textbox.index
-
-        if (startIndex == undefined){
-          console.log("Start index is undefined - case should never be reached");
-          break;
-        }
-
-        // find the matching textbox
-        const currentLineTextboxes = oldTemplateTextboxes.filter(template => template.line === index)
-        const matchingTextbox = currentLineTextboxes.find(textbox => textbox.from == startIndex && textbox.templateId == templateId && !textbox.snippetId );
-        if (!matchingTextbox) {
-          console.log("No textboxes were found in the matching case!")
-          return {
-            edited : false,
-            textboxesEdited : [],
-          }
-        }
-
-        oldTextboxContent.push({
-          innerContent, startIndex, line : index, sharedId: matchingTextbox.sharedId
-        })
-      }
-    })
-
-    // iterate through the new template content and edit all the textboxes to match the snippet instance
-    const snippets = this.snippetsManager.getSnippets(templateId);
-    
-    for (const snippet of snippets) {
-      const newTemplateContent = newContent.split("\n");
-      newTemplateContent.forEach((line, index) => {
-        const textboxesContent = [...line.matchAll(regex)];
-        const filteredOldTextboxes = oldTextboxContent.filter(info => info.line == index).sort((a,b) => a.startIndex - b.startIndex )
-        
-        for (let i = 0; i < textboxesContent.length; i++){
-          let innerContent = textboxesContent[i][1];
-          const correspondingTemplateTextbox = template.textboxes
-          .find(textbox => !textbox.snippetId && textbox.line == index && textbox.sharedId == filteredOldTextboxes[i].sharedId)
-          const correspondingSnippetTextbox = template.textboxes
-          .find(textbox => textbox.snippetId == snippet.id && textbox.line == index && textbox.sharedId == correspondingTemplateTextbox?.sharedId)
-                
-          if (!correspondingSnippetTextbox){
-            console.log("could not find the corresponding snippet textbox");
-            continue;
-          }
-
-          console.log("CORRESPONDING SNIPPET TEXTBOX" , correspondingSnippetTextbox)
-          console.log(`This textbox was edited! , ${innerContent} + ${filteredOldTextboxes[i].innerContent}`);
-          editedTextboxes.push({
-            newTextboxContent : innerContent,
-            sharedId : filteredOldTextboxes[i].sharedId
-          });
-           
-          // MASS UPDATE CASE!
-          
-          /** 
-          newTemplateContent[index] = newTemplateContent[index].replace("{{" + innerContent + "}}", innerContent)
-          this.snippetsManager.removeTextboxDeco(correspondingSnippetTextbox.id , snippet)
-          if (correspondingTemplateTextbox){
-            console.log("REMOVING TEXTBOX FROM TEMPLATE NOW!")
-            this.templateManager.removeTextboxDeco(correspondingTemplateTextbox.templateId, correspondingTemplateTextbox.id , correspondingTemplateTextbox.line , innerContent)
-            this.update()
-          } */
-
-          // DEFAULT PARAMETERS CASE!
-          newTemplateContent[index] = newTemplateContent[index].replace("{{" + innerContent + "}}", correspondingSnippetTextbox.content)
-        }
-      })
-      formattedTemplateContent.push({snippetId : snippet.id , templateContent : newTemplateContent.join("\n")});
-    }
-
-    console.log("FORMATTED TEMPLATE CONTENT ", formattedTemplateContent)
-    return formattedTemplateContent;
-    }
 
   async loadTemplates() : Promise<void> {
     try {
@@ -580,7 +430,6 @@ editTemplate = async (id: string, newContent: string) : Promise<void> => {
       deleteTemplate={this.deleteTemplate}
       renameTemplate={this.renameTemplate}
       editTemplate={this.editTemplate}
-      textboxEdit={this.textboxEdited}
       syncTemplate={this.syncTemplate}
       toggleTemplateColor={this.toggleTemplateColor}
       activeTemplateHighlightIds={this.templateManager.getActiveHighlights()}

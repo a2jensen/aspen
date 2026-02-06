@@ -9,7 +9,6 @@ import { Contents } from "@jupyterlab/services"
  * @type : tags : string[]  - Associates tags with templates - not implemented as of 3/5/25
  * @type color : string  - Color associated with the template - not implemented as of 3/5/25
  * @type : connections : string[] - Tracks associated snippet instances - not implemented as of 3/5/25 and may need refactoring
- * @type : textboxes : ITextbox[] - Tracks all textboxes in the template + textboxes in snippet instances
  */
 export interface ITemplate {
   id: string;
@@ -19,7 +18,6 @@ export interface ITemplate {
   dateUpdated: Date;
   tags: string[];
   color: string;
-  textboxes: ITextbox[];
 }
 
 /**
@@ -38,27 +36,6 @@ export interface ISnippet {
   end_line: number;
   template_id: string;
   }
-
-/**
-* @type id: number - Date created, unique identifier for the textbox
-* @type content : string - Content in textbox
-* @type line : number - Line number (relative to snippet)
-* @type from : number - Starting character position of textbox (relative to line)
-* @type to : number - Ending character position of textbox (relative to line)
-* @type templateId : string - Reference to associated templateID
-* @type snippetId : string - Reference to associated snippetID (if part of a snippet)
-*/
-
-export interface ITextbox{
-  id: number;
-  content: string;
-  line: number;
-  from: number;
-  to: number;
-  templateId: string;
-  snippetId?: string;
-  sharedId: number 
-}
 
 /**
  * Represents a single diff region between template and snippet content.

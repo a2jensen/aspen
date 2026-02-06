@@ -14,7 +14,6 @@ import {TemplatesManager} from "./TemplatesManager";
 import {ContentsManager} from "@jupyterlab/services";
 import {LibraryWidget} from "./LibraryWidget";
 import {SnippetsManager} from "./snippetManager";
-import { TextboxesManager } from './TextboxesManager';
 import { HighlightsManager } from './HighlightsManager';
 import {Synchronization} from "./Synchronization";
 import {CodeMirrorExtension} from "./CodeMirrorPlugin";
@@ -45,12 +44,10 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   const contentsManager = new ContentsManager();
   const templatesManager = new TemplatesManager(contentsManager);
   const snippetsManager = new SnippetsManager(contentsManager, templatesManager);
-  const textboxesManager = new TextboxesManager(templatesManager, snippetsManager,);
   const highlightsManager = new HighlightsManager(templatesManager, snippetsManager);
-  const libraryWidget = new LibraryWidget(templatesManager, snippetsManager, textboxesManager);
+  const libraryWidget = new LibraryWidget(templatesManager, snippetsManager);
   const synchronization = new Synchronization(templatesManager, snippetsManager, libraryWidget);
   libraryWidget.setSynchronization(synchronization);
-  textboxesManager.setLibraryWidget(libraryWidget) // setting widget
 
   libraryWidget.id = "jupyterlab-librarywidget-sidebarRight";
   libraryWidget.title.iconClass = "jp-SideBar-tabIcon"; 
@@ -258,8 +255,8 @@ async function activate(app: JupyterFrontEnd, restorer: ILayoutRestorer, extensi
   extensions.addExtension({
     name: "@aspen/codemirror_plugin",
     factory: () => ({
-      extension: CodeMirrorExtension(synchronization, snippetsManager, textboxesManager, highlightsManager, notebookTracker),
-      instance: () => CodeMirrorExtension(synchronization, snippetsManager, textboxesManager, highlightsManager, notebookTracker),
+      extension: CodeMirrorExtension(synchronization, snippetsManager, highlightsManager, notebookTracker),
+      instance: () => CodeMirrorExtension(synchronization, snippetsManager, highlightsManager, notebookTracker),
       reconfigure: () => null
     })
   });

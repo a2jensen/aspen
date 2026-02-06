@@ -1,14 +1,15 @@
 # Implementation Checkpoint
 
 **Date:** 2026-02-04
-**Status:** Phase 1-4 complete. Placeholder updates now use merged diffs; remaining bug with last placeholder not clearing.
+**Status:** Phase 1-4 complete. Phase 5 cleanup in progress; legacy textbox system removed.
 
 ---
 
 ## Current Status
 
 Phases 1, 3, and 4 are **complete and working** for single snippets.
-Phase 2 (template placeholder updates) has been refactored to use **merged diffs across snippets**. Infinite loop resolved, but a **last-placeholder not clearing** bug remains.
+Phase 2 (template placeholder updates) has been refactored to use **merged diffs across snippets**. Infinite loop resolved; last-placeholder issue fixed.
+Phase 5 cleanup is underway, removing the legacy textbox system in favor of diff-based highlights.
 
 ---
 
@@ -38,10 +39,14 @@ Phase 2 (template placeholder updates) has been refactored to use **merged diffs
 - Added `highlightsManager.onSnippetEdit(snippet)` call
 - Removed whitespace check that was preventing line-count detection
 
-### Phase 2: Template Placeholder Updates ⚠️ (Has Bug)
+### Phase 2: Template Placeholder Updates ✅
 - Placeholder updates now computed from **merged diffs across all snippets**
 - LibraryWidget is notified via `'updateLibrary'` event
-- **BUG:** When all snippets revert to match, the last placeholder sometimes remains
+
+### Phase 5: Cleanup (In Progress) ⚠️
+- Removed `TextboxesManager` usage and deleted `src/TextboxesManager.ts`
+- Removed `textboxes` field from `ITemplate` and `ITextbox` types
+- Library template editing now syncs snippets using placeholder-stripped content
 
 ### CLI Testing Tool ✅
 - **Files:** `src/cli/diffTester.ts`, `src/cli/formatOutput.ts`, `src/cli/types.ts`
@@ -52,12 +57,9 @@ Phase 2 (template placeholder updates) has been refactored to use **merged diffs
 
 ## Current Issues
 
-### 1. Last Placeholder Not Clearing 🔴
-**Symptom:** With multiple snippets, after reverting all to match the template, one final placeholder remains in the template.
-**Repro:** Template `x = 1\ny = 1`, Snippet A -> `x = 2`, Snippet B -> `y = 3`, then revert B then A. After last revert, one `{{}}` persists.
-**Suspected causes:**
-1. Merged diff computation leaves a stale region when diffs drop to zero
-2. Placeholder updates still using stale template content or positions
+### 1. Cleanup Gaps 🔴
+**Symptom:** Remaining references to legacy textbox system should be removed or renamed (e.g., `textboxStateField` naming).
+**Next action:** Complete Phase 5 cleanup passes and update documentation accordingly.
 
 ---
 
@@ -71,7 +73,7 @@ Phase 2 (template placeholder updates) has been refactored to use **merged diffs
 
 ## Not Working (Multiple Snippets)
 
-1. 🔴 Template `{{}}` markers sometimes do not auto-clear when all snippets match (last placeholder persists)
+None currently observed after merged-diff and placeholder cleanup.
 
 ---
 
@@ -80,7 +82,8 @@ Phase 2 (template placeholder updates) has been refactored to use **merged diffs
 | File | Status | Changes |
 |------|--------|---------|
 | `src/diffEngine.ts` | ✅ | Core diff logic, placeholder functions |
-| `src/HighlightsManager.ts` | ⚠️ | Orchestrates highlights, has infinite loop bug |
+| `src/HighlightsManager.ts` | ✅ | Orchestrates diff highlights with merged placeholder updates |
+| `src/TextboxesManager.ts` | ✅ | Deleted (legacy system removed) |
 | `src/snippetManager.ts` | ✅ | `applyDiffHighlights()`, `clearSnippetHighlights()` |
 | `src/CodeMirrorPlugin.ts` | ✅ | Disabled old textbox calls, integrated HighlightsManager |
 | `src/index.ts` | ✅ | Added HighlightsManager initialization |
@@ -148,11 +151,50 @@ npx tsx src/cli/diffTester.ts test-cases/replacement.json
 npx tsx src/cli/diffTester.ts test-cases/
 ```
 
+## Manual Testing (Phase 5)
+
+1. Save selection as template: highlight code → "Save Code Snippet"
+2. Expected: selected code becomes a snippet instance with border immediately
+3. Toggle template border off/on
+4. Expected: borders hide/show instantly without editing
+
+1. Drag template into notebook to create instance
+2. Expected: border appears immediately
+3. Edit within snippet
+4. Expected: diff highlights appear
+
+1. Template: `df = pd.read_csv("data.csv")`
+2. Instance: change to `"sales.csv"`
+3. Expected: highlight on `"sales.csv"`; template shows `{{data.csv}}`
+
+1. Template: `print("hello")`
+2. Instance: `print("hello")  # comment`
+3. Expected: comment highlighted; template shows `print("hello"){{}}`
+4. Delete comment
+5. Expected: highlight removed; placeholder removed
+
+1. Template:
+   ```
+   x = 1
+   y = 1
+   ```
+2. Create two instances
+3. Snippet A: `x = 2`, Snippet B: `y = 3`
+4. Expected: template shows placeholders for both `x` and `y`
+5. Revert B then A back to original
+6. Expected: all placeholders gone
+
+1. Add a new line inside a snippet
+2. Expected: auto-unsync triggers (border removed, no highlights)
+
+1. Edit template text in sidebar
+2. Expected: all instances update immediately
+
 ---
 
 ## Key Files to Review
 
-- `src/HighlightsManager.ts` - Main orchestration, has the bug
+- `src/HighlightsManager.ts` - Main orchestration for diff highlights
 - `src/CodeMirrorPlugin.ts` - Integration point, lines 248-255
-- `src/LibraryWidget.tsx` - Check `handleUpdateLibrary` method
+- `src/LibraryWidget.tsx` - Template edit + sync behavior
 - `src/diffEngine.ts` - Core logic, works correctly
