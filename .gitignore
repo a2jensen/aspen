@@ -11,9 +11,6 @@ jupyterlab_apod/labextension
 # Version file is handled by hatchling
 jupyterlab_apod/_version.py
 
-# Snippets Directory
-snippets
-
 # Integration tests
 ui-tests/test-results/
 ui-tests/playwright-report/
