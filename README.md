@@ -36,8 +36,7 @@ jupyter labextension develop --overwrite .
 After the install completes, open a second terminal. Run these commands to activate the jupyterlab-ext environment and start JupyterLab in your default web browser.
 
 ```bash
-conda activate jupyterlab-ext
-jupyter lab
+conda activate aspen
 ```
 
 Afterwords, navigate to the dev console and look for a message along the lines of "JupyterLab extension jupyterlab_apod is activated!" You should be setup now.
