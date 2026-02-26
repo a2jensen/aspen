@@ -11,7 +11,7 @@ import {
 } from '@codemirror/view';
 import { SnippetsManager, textboxStateField } from './snippetManager';
 import { HighlightsManager } from './HighlightsManager';
-import { ISnippet } from './types';
+// import { ISnippet } from './types'; // visual diffs disabled
 import { defaultKeymap} from '@codemirror/commands';
 import { customKeymap } from './customkeyBinds';
 import { INotebookTracker } from "@jupyterlab/notebook"
@@ -96,7 +96,7 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
           if (!cellId) return;
 
           snippetsManager.update(cellId, currentView!);
-          const newSnippet = snippetsManager.create(
+          snippetsManager.create(
             currentView!,
             startLine,
             endLine,
@@ -106,7 +106,7 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
             cellId
           );
           snippetsManager.assignDecorations(currentView!, cellId);
-          highlightsManager.onSnippetEdit(newSnippet);
+          // highlightsManager.onSnippetEdit(newSnippet); // visual diffs disabled
         }, 10);
 
         const cursorPos = selection.to;
@@ -186,10 +186,10 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
             if (!cellId){ return; }
 
             const notebookId : string = notebookTracker.currentWidget.context.path
-            const newSnippet = snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
+            snippetsManager.create(currentView!, startLine, endLine, templateID, droppedText, notebookId, cellId);
             snippetsManager.update(cellId,currentView!);
             snippetsManager.assignDecorations(currentView!, cellId);
-            highlightsManager.onSnippetEdit(newSnippet);
+            // highlightsManager.onSnippetEdit(newSnippet); // visual diffs disabled
 
             // move cursor to end of inserted text, so that there is no selection
             const cursorPos = dropPos + droppedText.length;
@@ -250,9 +250,9 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
           lastSelection = { from: selection.from, to: selection.to };
         }
 
-        const cursorPos = selection.head;
-        const cursorLine = update.state.doc.lineAt(cursorPos).number;
-        const editedSnippets : ISnippet[] = snippetsManager.snippetTracker.filter(s => s.cell_id === cellId);
+        // const cursorPos = selection.head; // visual diffs disabled
+        // const cursorLine = update.state.doc.lineAt(cursorPos).number; // visual diffs disabled
+        // const editedSnippets : ISnippet[] = snippetsManager.snippetTracker.filter(s => s.cell_id === cellId); // visual diffs disabled
 
         if (!update.docChanged) {
           // Refresh snippet borders on non-doc transactions (e.g., toggle highlight, selection changes).
@@ -269,14 +269,12 @@ export function CodeMirrorExtension(synchronization : Synchronization, snippetsM
           return;
         }
         
-        // Check all edited snippets for diff-based highlights
-        for (const snippet of editedSnippets) {
-          // Call onSnippetEdit for any change within snippet bounds
-          // The diff engine will handle line count mismatches (unsync) and content diffs (highlights)
-          if (cursorLine >= snippet.start_line && cursorLine <= snippet.end_line) {
-            highlightsManager.onSnippetEdit(snippet);
-          }
-        }
+        // visual diffs disabled
+        // for (const snippet of editedSnippets) {
+        //   if (cursorLine >= snippet.start_line && cursorLine <= snippet.end_line) {
+        //     highlightsManager.onSnippetEdit(snippet);
+        //   }
+        // }
       }
     },
     {
